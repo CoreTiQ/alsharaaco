@@ -260,17 +260,18 @@ export default function Calendar() {
                                 </span>
                                 <span className="text-dark-200">{l.message}</span>
                               </div>
-                              {l.changes && Object.keys(l.changes).length>0 && (
-                                <div className="mt-2 grid grid-cols-1 gap-1 text-xs">
-                                  {Object.entries(l.changes).map(([field,vals]: any)=>(
-                                    <div key={field} className="flex gap-2">
-                                      <span className="text-dark-400 min-w-28">{field}:</span>
-                                      <span className="line-through text-red-300/80">{String((vals as any).old ?? '')}</span>
-                                      <span className="text-blue-300">→ {String((vals as any).new ?? '')}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                                {l.changes && typeof l.changes === "object" && Object.keys(l.changes||{}).length > 0 && (
+                                  <div className="mt-2 grid grid-cols-1 gap-1 text-xs">
+                                    {Object.entries(l.changes || {}).map(([field, vals]: any) => (
+                                      <div key={field} className="flex gap-2">
+                                        <span className="text-dark-400 min-w-28">{field}:</span>
+                                        <span className="line-through text-red-300/80">{String(vals?.old ?? '')}</span>
+                                        <span className="text-blue-300">→ {String(vals?.new ?? '')}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
                             </div>
                           ))}
                         </div>
