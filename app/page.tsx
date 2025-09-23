@@ -40,13 +40,12 @@ export default function Calendar() {
     setLoading(true)
     const s=format(startOfMonth(currentMonth),"yyyy-MM-dd")
     const e=format(endOfMonth(currentMonth),"yyyy-MM-dd")
-    const {data,error}=await supabase.from("events").select("*").gte("date",s).lte("date",e).order("created_at",{ascending:false})
-    if(error){ setEvents([]); toast.error("خطأ في تحميل الأحداث") } else { setEvents(data||[]) }
+    const {data,error}=await supabase.from("events").select("*").gte("date",s).lte("date",e).neq("status","deleted").order("created_at",{ascending:false})
+    if(error){ setEvents([]); toast.error("خطأ في تحميل القضايا") } else { setEvents(data||[]) }
     setLoading(false)
   }
 
   const eventsFor=(d:Date)=> events.filter(ev=>isSameDay(new Date(ev.date),d))
-
   const openForDay=(d:Date)=>{ setSelectedDate(d); setTitle(""); setDesc(""); setLongDesc(""); setCourt(""); setLawyers(""); setEditing(null); setLogMsg(""); setPostponeOpen(null) }
 
   const loadLogs=async(case_ref:string)=>{
@@ -87,31 +86,25 @@ export default function Calendar() {
 
   const deleteEvent=async(id:string)=>{
     if(!auth.isLoggedIn) return
-    if(!window.confirm("حذف القضية؟")) return
-    const {error}=await supabase.from("events").delete().eq("id",id)
-    if(error){ toast.error("خطأ في الحذف") } else { setEvents(prev=>prev.filter(ev=>ev.id!==id)); toast.success("تم الحذف") }
+    if(!window.confirm("حذف القضية (حذف منطقي)؟")) return
+    const {error}=await supabase.from("events").update({ status:"deleted", deleted_at:new Date().toISOString() }).eq("id",id)
+    if(error){ toast.error("فشل الحذف") } else { setEvents(prev=>prev.filter(ev=>ev.id!==id)); toast.success("تم الحذف") }
   }
 
   const addLog=async(case_ref:string)=>{
     if(!auth.isLoggedIn||!logMsg.trim()) return
-    const {data,error}=await supabase.from("event_logs").insert([{case_ref, message:logMsg.trim()}]).select()
-    if(error){ toast.error("خطأ في السجل") } else {
-      setLogs(prev=>({...prev,[case_ref]:[...(prev[case_ref]||[]),...(data||[])]}))
-      setLogMsg("")
-      toast.success("تمت إضافة بند للسجل")
-    }
+    const {data,error}=await supabase.from("event_logs").insert([{ case_ref, kind:"note", message:logMsg.trim(), actor:"admin" }]).select()
+    if(error){ toast.error("خطأ في السجل") } else { setLogs(prev=>({...prev,[case_ref]:[...(prev[case_ref]||[]),...(data||[])]})); setLogMsg(""); toast.success("أضيفت ملاحظة") }
   }
 
   const openPostpone=(ev:Event)=>{ setPostponeOpen(ev); setPostponeDate("") }
-
   const confirmPostpone=async()=>{
     if(!postponeOpen||!postponeDate||!auth.isLoggedIn) return
     const old=postponeOpen
-    const newDate=postponeDate
-    const {error:upErr}=await supabase.from("events").update({status:"postponed", postponed_to:newDate}).eq("id",old.id)
+    const {error:upErr}=await supabase.from("events").update({status:"postponed", postponed_to:postponeDate}).eq("id",old.id)
     if(upErr){ toast.error("فشل تأجيل الأصلية"); return }
     const {data:newRow,error:newErr}=await supabase.from("events").insert([{
-      date:newDate,
+      date:postponeDate,
       title:old.title,
       description:old.description,
       long_description:old.long_description,
@@ -120,11 +113,20 @@ export default function Calendar() {
       status:"open",
       case_ref:old.case_ref
     }]).select()
-    await supabase.from("event_logs").insert([
-      {case_ref:old.case_ref, message:`تأجيل من ${f(old.date)} إلى ${f(newDate)}`}
-    ])
-    if(newErr){ toast.error("فشل إنشاء الحالة الجديدة") } else { setEvents(prev=>[...prev.map(e=>e.id===old.id?{...e,status:"postponed",postponed_to:newDate}:e), ...(newRow||[])]); toast.success("تم التأجيل") }
+    if(newErr){ toast.error("فشل إنشاء النسخة المؤجلة") } else { setEvents(prev=>[...prev.map(e=>e.id===old.id?{...e,status:"postponed",postponed_to:postponeDate}:e), ...(newRow||[])]); toast.success("تم التأجيل") }
     setPostponeOpen(null)
+  }
+
+  const closeEvent=async(ev:Event)=>{
+    if(!auth.isLoggedIn) return
+    const {error}=await supabase.from("events").update({status:"closed"}).eq("id",ev.id)
+    if(!error) setEvents(p=>p.map(e=>e.id===ev.id?{...e,status:"closed"}:e))
+  }
+
+  const reopenEvent=async(ev:Event)=>{
+    if(!auth.isLoggedIn) return
+    const {error}=await supabase.from("events").update({status:"open"}).eq("id",ev.id)
+    if(!error) setEvents(p=>p.map(e=>e.id===ev.id?{...e,status:"open"}:e))
   }
 
   const nextM=()=>setCurrentMonth(addMonths(currentMonth,1))
@@ -199,9 +201,12 @@ export default function Calendar() {
                 <div key={ev.id} className="p-4 bg-dark-700/50 rounded-lg border border-dark-600">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <h4 className="font-semibold text-blue-400">{ev.title}</h4>
-                        {ev.status==="postponed"&&ev.postponed_to&&(<span className="text-xs text-yellow-300">مؤجّلة إلى {f(ev.postponed_to)}</span>)}
+                        <div className="flex items-center gap-2">
+                          {ev.status==="postponed"&&ev.postponed_to&&(<span className="text-xs text-yellow-300">مؤجّلة إلى {f(ev.postponed_to)}</span>)}
+                          {ev.status==="closed"&&(<span className="text-xs text-emerald-300">مغلقة</span>)}
+                        </div>
                       </div>
                       {ev.court_name&&(<div className="text-sm text-dark-300 mt-1">المحكمة: {ev.court_name}</div>)}
                       {ev.lawyers&&ev.lawyers.length>0&&(
@@ -211,10 +216,12 @@ export default function Calendar() {
                       )}
                       {ev.description&&(<p className="text-dark-300 text-sm mt-2">{ev.description}</p>)}
                       {ev.long_description&&(<p className="text-dark-200 text-sm mt-2 whitespace-pre-wrap">{ev.long_description}</p>)}
-                      <button onClick={()=>{setEditing(ev); setTitle(""); loadLogs(ev.case_ref)}} className="mt-3 text-xs text-blue-400 underline">فتح التفاصيل والسجل</button>
+                      <button onClick={async()=>{ setEditing(ev); await loadLogs(ev.case_ref) }} className="mt-3 text-xs text-blue-400 underline">التفاصيل والسجل</button>
                     </div>
                     {auth.isLoggedIn&&(
                       <div className="flex gap-1">
+                        {ev.status!=="closed"&&(<button onClick={()=>closeEvent(ev)} className="p-2 text-emerald-300 hover:bg-emerald-400/20 rounded-lg" title="إغلاق">✔</button>)}
+                        {ev.status==="closed"&&(<button onClick={()=>reopenEvent(ev)} className="p-2 text-amber-300 hover:bg-amber-400/20 rounded-lg" title="إعادة فتح">↺</button>)}
                         <button onClick={()=>openPostpone(ev)} className="p-2 text-yellow-300 hover:bg-yellow-400/20 rounded-lg" title="تأجيل">↦</button>
                         <button onClick={()=>deleteEvent(ev.id)} className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg" title="حذف">🗑</button>
                       </div>
@@ -234,14 +241,42 @@ export default function Calendar() {
                       </div>
                       <div className="mt-3 border-t border-dark-600 pt-3">
                         <div className="text-sm mb-2">سجل التحديثات</div>
-                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                        <div className="space-y-2 max-h-44 overflow-y-auto">
                           {(logs[ev.case_ref]||[]).map(l=>(
-                            <div key={l.id} className="text-xs text-dark-300">{f(l.created_at)} — {l.message}</div>
+                            <div key={l.id} className="rounded-lg p-2 border border-dark-600 bg-dark-700/40">
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="text-dark-400">{format(new Date(l.created_at), "dd/MM/yyyy HH:mm")}</span>
+                                <span className={
+                                  "px-2 py-0.5 rounded-full " +
+                                  (l.kind==='postpone' ? "bg-yellow-500/20 text-yellow-300" :
+                                   l.kind==='update'   ? "bg-blue-500/20 text-blue-300"   :
+                                   l.kind==='create'   ? "bg-emerald-500/20 text-emerald-300" :
+                                   l.kind==='delete'   ? "bg-red-500/20 text-red-300"     :
+                                   l.kind==='close'    ? "bg-emerald-700/30 text-emerald-300" :
+                                   l.kind==='reopen'   ? "bg-amber-600/30 text-amber-200" :
+                                                         "bg-gray-600/30 text-gray-200")
+                                }>
+                                  {l.kind}
+                                </span>
+                                <span className="text-dark-200">{l.message}</span>
+                              </div>
+                              {l.changes && Object.keys(l.changes).length>0 && (
+                                <div className="mt-2 grid grid-cols-1 gap-1 text-xs">
+                                  {Object.entries(l.changes).map(([field,vals]: any)=>(
+                                    <div key={field} className="flex gap-2">
+                                      <span className="text-dark-400 min-w-28">{field}:</span>
+                                      <span className="line-through text-red-300/80">{String((vals as any).old ?? '')}</span>
+                                      <span className="text-blue-300">→ {String((vals as any).new ?? '')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           ))}
                         </div>
                         {auth.isLoggedIn&&(
                           <div className="flex gap-2 mt-2">
-                            <input value={logMsg} onChange={e=>setLogMsg(e.target.value)} placeholder="أضف بندًا للسجل" className="flex-1 p-2 bg-dark-700 border border-dark-600 rounded-lg outline-none"/>
+                            <input value={logMsg} onChange={e=>setLogMsg(e.target.value)} placeholder="أضف ملاحظة للسجل" className="flex-1 p-2 bg-dark-700 border border-dark-600 rounded-lg outline-none"/>
                             <button onClick={()=>addLog(ev.case_ref)} className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg">إضافة</button>
                           </div>
                         )}
