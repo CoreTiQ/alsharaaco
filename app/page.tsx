@@ -21,6 +21,7 @@ export default function Calendar() {
   const [postponingEvent, setPostponingEvent] = useState<Event|null>(null)
   const [editMode, setEditMode] = useState(false)
   const [noteText, setNoteText] = useState('')
+  const [addingEvent, setAddingEvent] = useState(false)
 
   const [newEvent, setNewEvent] = useState({ title: '', court_name: '', lawyers: '', description: '', long_description: '' })
   const [editData, setEditData] = useState({ title: '', court_name: '', lawyers: '', description: '', long_description: '' })
@@ -44,6 +45,7 @@ export default function Calendar() {
         .lte('date', format(monthEnd,'yyyy-MM-dd'))
         .neq('status', 'deleted')
         .order('date', {ascending:true})
+        .order('created_at', {ascending:false})
       if (error) throw error
       setEvents(data || [])
     } catch { toast.error('فشل تحميل البيانات') }
@@ -52,13 +54,14 @@ export default function Calendar() {
 
   const dayEvents = (d: Date) => events.filter(e=>isSameDay(new Date(e.date), d))
   const formatDate = (date:string|Date) => format(new Date(date), 'dd/MM/yyyy')
+  const formatDateISO = (date:Date) => format(date, 'yyyy-MM-dd')
   const formatDateTime = (date:string) => format(new Date(date), 'dd/MM/yyyy HH:mm')
   const isCurrentMonth = (date:Date) => date.getMonth()===currentMonth.getMonth()
 
   const openDay = (d: Date) => {
     setSelectedDate(d)
     setShowDayModal(true)
-    if (authStatus.isLoggedIn) setNewEvent({ title: '', court_name: '', lawyers: '', description: '', long_description: '' })
+    setNewEvent({ title: '', court_name: '', lawyers: '', description: '', long_description: '' })
   }
 
   const fetchLogs = async (caseRef:string) => {
@@ -82,10 +85,11 @@ export default function Calendar() {
 
   const handleCreateEvent = async () => {
     if (!authStatus.isLoggedIn || !newEvent.title || !selectedDate) return
+    setAddingEvent(true)
     try {
       const lawyersArray = newEvent.lawyers.split(',').map(l=>l.trim()).filter(Boolean)
       const {data,error} = await supabase.from('events').insert([{
-        date: format(selectedDate,'yyyy-MM-dd'),
+        date: formatDateISO(selectedDate),
         title: newEvent.title,
         court_name: newEvent.court_name || null,
         lawyers: lawyersArray.length?lawyersArray:null,
@@ -96,8 +100,9 @@ export default function Calendar() {
       if (error) throw error
       setEvents(prev => [...prev, ...(data||[])])
       setNewEvent({ title: '', court_name: '', lawyers: '', description: '', long_description: '' })
-      toast.success('تمت إضافة القضية لهذا اليوم')
+      toast.success('تمت إضافة القضية بنجاح')
     } catch { toast.error('فشلت الإضافة') }
+    finally { setAddingEvent(false) }
   }
 
   const handleUpdateEvent = async () => {
@@ -125,9 +130,12 @@ export default function Calendar() {
   const handlePostpone = async () => {
     if (!postponingEvent || !postponeDate || !authStatus.isLoggedIn) return
     try {
-      const {error:updateError} = await supabase.from('events').update({ status: 'postponed', postponed_to: postponeDate }).eq('id', postponingEvent.id)
+      const {error:updateError} = await supabase.from('events').update({
+        status: 'postponed',
+        postponed_to: postponeDate
+      }).eq('id', postponingEvent.id)
       if (updateError) throw updateError
-      const {data,error} = await supabase.from('events').insert([{
+      const {error} = await supabase.from('events').insert([{
         date: postponeDate,
         title: postponingEvent.title,
         court_name: postponingEvent.court_name,
@@ -136,7 +144,7 @@ export default function Calendar() {
         long_description: postponingEvent.long_description,
         status: 'open',
         case_ref: postponingEvent.case_ref
-      }]).select()
+      }])
       if (error) throw error
       await fetchEvents()
       setPostponingEvent(null)
@@ -162,7 +170,10 @@ export default function Calendar() {
   const handleDelete = async (event:Event) => {
     if (!authStatus.isLoggedIn || !confirm('هل تريد حذف هذه القضية؟')) return
     try {
-      const {error} = await supabase.from('events').update({ status: 'deleted', deleted_at: new Date().toISOString() }).eq('id', event.id)
+      const {error} = await supabase.from('events').update({
+        status: 'deleted',
+        deleted_at: new Date().toISOString()
+      }).eq('id', event.id)
       if (error) throw error
       setEvents(prev=>prev.filter(e=>e.id!==event.id))
       if (selectedEvent?.id === event.id) setSelectedEvent(null)
@@ -173,7 +184,12 @@ export default function Calendar() {
   const handleAddNote = async () => {
     if (!selectedEvent || !noteText.trim() || !authStatus.isLoggedIn) return
     try {
-      const {data,error} = await supabase.from('event_logs').insert([{ case_ref: selectedEvent.case_ref, kind: 'note', message: noteText.trim(), actor: 'admin' }]).select()
+      const {data,error} = await supabase.from('event_logs').insert([{
+        case_ref: selectedEvent.case_ref,
+        kind: 'note',
+        message: noteText.trim(),
+        actor: 'admin'
+      }]).select()
       if (error) throw error
       const added = data?.[0]
       if (added) setLogs(prev=>({...prev,[selectedEvent.case_ref]:[...(prev[selectedEvent.case_ref]||[]),added]}))
@@ -246,6 +262,7 @@ export default function Calendar() {
                                 e.status==='closed'?'bg-gray-700/50 text-gray-400':
                                 e.status==='postponed'?'bg-yellow-900/30 text-yellow-400':'bg-blue-900/30 text-blue-400'
                               }`}
+                              title={e.title}
                             >
                               {e.title}
                             </div>
@@ -264,24 +281,31 @@ export default function Calendar() {
 
       {showDayModal && selectedDate && (
         <div className="modal-backdrop" onClick={()=>{setShowDayModal(false); setSelectedDate(null)}}>
-          <div className="modal-content" onClick={e=>e.stopPropagation()}>
+          <div className="modal-content max-w-4xl" onClick={e=>e.stopPropagation()}>
             <div className="p-6 border-b border-dark-700 flex items-center justify-between">
-              <h3 className="text-xl font-bold">يوم {formatDate(selectedDate)}</h3>
+              <h3 className="text-xl font-bold">قضايا يوم {formatDate(selectedDate)}</h3>
               <button onClick={()=>{setShowDayModal(false); setSelectedDate(null)}} className="p-2 hover:bg-dark-700 rounded-lg">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-dark-700">
-              <div className="p-6 max-h-[70vh] overflow-y-auto">
-                <h4 className="font-semibold mb-3 text-gray-300">قضايا هذا اليوم</h4>
-                <div className="space-y-2">
-                  {dayEvents(selectedDate).length === 0 && <div className="text-sm text-gray-500">لا توجد قضايا</div>}
+            <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-dark-700">
+              <div className="flex-1 p-6 max-h-[60vh] overflow-y-auto">
+                <h4 className="font-semibold mb-4 text-gray-300">القضايا المسجلة ({dayEvents(selectedDate).length})</h4>
+                <div className="space-y-3">
+                  {dayEvents(selectedDate).length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                      </svg>
+                      <p>لا توجد قضايا في هذا اليوم</p>
+                    </div>
+                  )}
                   {dayEvents(selectedDate).map(ev=>(
-                    <div key={ev.id} className="p-3 bg-dark-700/40 rounded-lg border border-dark-600">
-                      <div className="flex items-start justify-between">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
+                    <div key={ev.id} className="p-4 bg-dark-700/40 rounded-lg border border-dark-600 hover:bg-dark-700/60 transition-colors">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
                             <span className={`status-badge ${
                               ev.status==='closed'?'bg-gray-900/30 text-gray-400 border-gray-600':
                               ev.status==='postponed'?'bg-yellow-900/30 text-yellow-400 border-yellow-600':
@@ -289,21 +313,24 @@ export default function Calendar() {
                             }`}>
                               {ev.status==='closed'?'مغلقة':ev.status==='postponed'?'مؤجلة':'مفتوحة'}
                             </span>
-                            <h5 className="font-semibold text-blue-400 truncate">{ev.title}</h5>
+                            <h5 className="font-semibold text-blue-400">{ev.title}</h5>
                           </div>
-                          {ev.court_name && <div className="text-xs text-gray-400 mt-1">المحكمة: {ev.court_name}</div>}
+                          {ev.court_name && <p className="text-sm text-gray-400 mb-1">المحكمة: {ev.court_name}</p>}
                           {ev.lawyers && ev.lawyers.length>0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {ev.lawyers.map((l,i)=>(<span key={i} className="px-2 py-0.5 bg-dark-800 rounded-full text-[11px]">{l}</span>))}
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {ev.lawyers.map((l,i)=>(<span key={i} className="px-2 py-0.5 bg-dark-800 rounded-full text-xs">{l}</span>))}
                             </div>
                           )}
+                          {ev.description && <p className="text-sm text-gray-300 line-clamp-2">{ev.description}</p>}
                           {ev.status==='postponed' && ev.postponed_to && (
-                            <div className="text-xs text-yellow-400 mt-1">مؤجلة إلى {formatDate(ev.postponed_to)}</div>
+                            <p className="text-sm text-yellow-400 mt-2">مؤجلة إلى {formatDate(ev.postponed_to)}</p>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button onClick={()=>openEventDetails(ev)} className="btn-secondary px-3 py-1">تفاصيل</button>
-                          {authStatus.isLoggedIn && <button onClick={()=>handleDelete(ev)} className="btn-danger px-3 py-1">حذف</button>}
+                        <div className="flex flex-col gap-2">
+                          <button onClick={()=>openEventDetails(ev)} className="btn-secondary text-sm px-3 py-1">تفاصيل</button>
+                          {authStatus.isLoggedIn && ev.status!=='closed' && (
+                            <button onClick={()=>setPostponingEvent(ev)} className="btn-secondary text-sm px-3 py-1">تأجيل</button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -311,22 +338,20 @@ export default function Calendar() {
                 </div>
               </div>
 
-              <div className="p-6">
-                <h4 className="font-semibold mb-3 text-gray-300">إضافة قضايا متعددة</h4>
-                {authStatus.isLoggedIn ? (
+              {authStatus.isLoggedIn && (
+                <div className="flex-1 p-6">
+                  <h4 className="font-semibold mb-4 text-gray-300">إضافة قضية جديدة</h4>
                   <div className="space-y-3">
-                    <input value={newEvent.title} onChange={e=>setNewEvent({...newEvent,title:e.target.value})} placeholder="عنوان القضية" className="w-full p-3 rounded-lg border"/>
-                    <input value={newEvent.court_name} onChange={e=>setNewEvent({...newEvent,court_name:e.target.value})} placeholder="المحكمة" className="w-full p-3 rounded-lg border"/>
-                    <input value={newEvent.lawyers} onChange={e=>setNewEvent({...newEvent,lawyers:e.target.value})} placeholder="المحامون (مفصولين بفاصلة)" className="w-full p-3 rounded-lg border"/>
-                    <textarea value={newEvent.description} onChange={e=>setNewEvent({...newEvent,description:e.target.value})} placeholder="وصف مختصر" rows={2} className="w-full p-3 rounded-lg border"/>
-                    <textarea value={newEvent.long_description} onChange={e=>setNewEvent({...newEvent,long_description:e.target.value})} placeholder="تفاصيل القضية" rows={3} className="w-full p-3 rounded-lg border"/>
-                    <button onClick={handleCreateEvent} disabled={!newEvent.title} className="btn-primary w-full">إضافة قضية لهذا اليوم</button>
-                    <div className="text-xs text-gray-500">يبقى النموذج مفتوحًا لتكرار الإضافة لقضايا أخرى في نفس اليوم</div>
+                    <input value={newEvent.title} onChange={e=>setNewEvent({...newEvent,title:e.target.value})} placeholder="عنوان القضية *" className="w-full p-3 rounded-lg border"/>
+                    <input value={newEvent.court_name} onChange={e=>setNewEvent({...newEvent,court_name:e.target.value})} placeholder="اسم المحكمة" className="w-full p-3 rounded-lg border"/>
+                    <input value={newEvent.lawyers} onChange={e=>setNewEvent({...newEvent,lawyers:e.target.value})} placeholder="أسماء المحامين (مفصولة بفاصلة)" className="w-full p-3 rounded-lg border"/>
+                    <textarea value={newEvent.description} onChange={e=>setNewEvent({...newEvent,description:e.target.value})} placeholder="وصف مختصر للقضية" rows={3} className="w-full p-3 rounded-lg border"/>
+                    <textarea value={newEvent.long_description} onChange={e=>setNewEvent({...newEvent,long_description:e.target.value})} placeholder="تفاصيل إضافية" rows={4} className="w-full p-3 rounded-lg border"/>
+                    <button onClick={handleCreateEvent} disabled={!newEvent.title || addingEvent} className="btn-primary w-full disabled:opacity-50">{addingEvent?'جاري الإضافة...':'إضافة القضية'}</button>
+                    <p className="text-xs text-gray-500 text-center">النموذج يبقى مفتوحاً لإضافة قضايا أخرى في نفس اليوم</p>
                   </div>
-                ) : (
-                  <div className="text-sm text-gray-500">تسجيل دخول المدير مطلوب للإضافة</div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -441,15 +466,18 @@ export default function Calendar() {
                               <span className="text-gray-500 min-w-[80px]">
                                 {field==='title'?'العنوان':field==='court_name'?'المحكمة':field==='lawyers'?'المحامون':field==='description'?'الوصف':field==='long_description'?'التفاصيل':field==='status'?'الحالة':field}:
                               </span>
-                              <span className="line-through text-red-400/70">{String(values?.old ?? '')}</span>
-                              <span className="text-gray-500">←</span>
-                              <span className="text-green-400">{String(values?.new ?? '')}</span>
+                              {values?.old && <span className="line-through text-red-400/70">{String(values.old)}</span>}
+                              {values?.old && values?.new && <span className="text-gray-500">←</span>}
+                              {values?.new && <span className="text-green-400">{String(values.new)}</span>}
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
                   ))}
+                  {(!logs[selectedEvent.case_ref] || logs[selectedEvent.case_ref].length === 0) && (
+                    <div className="text-center py-4 text-gray-500 text-sm">لا يوجد سجل زمني</div>
+                  )}
                 </div>
 
                 {authStatus.isLoggedIn && (
@@ -471,9 +499,12 @@ export default function Calendar() {
               <h3 className="text-xl font-bold">تأجيل القضية</h3>
             </div>
             <div className="p-6 space-y-4">
-              <p className="text-gray-300">تأجيل: <strong>{postponingEvent.title}</strong></p>
+              <p className="text-gray-300">تأجيل: <strong className="text-blue-400">{postponingEvent.title}</strong></p>
               <p className="text-sm text-gray-500">من تاريخ: {formatDate(postponingEvent.date)}</p>
-              <input type="date" value={postponeDate} onChange={e => setPostponeDate(e.target.value)} min={format(new Date(), 'yyyy-MM-dd')} className="w-full p-3 rounded-lg border"/>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">التاريخ الجديد</label>
+                <input type="date" value={postponeDate} onChange={e => setPostponeDate(e.target.value)} min={format(new Date(), 'yyyy-MM-dd')} className="w-full p-3 rounded-lg border"/>
+              </div>
             </div>
             <div className="p-6 border-t border-dark-700 flex gap-3">
               <button onClick={handlePostpone} disabled={!postponeDate} className="btn-primary flex-1">تأكيد التأجيل</button>
