@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif}
+body{@apply bg-dark-900 text-dark-100 overflow-x-hidden}
+
+.calendar-day{@apply w-full h-20 border border-dark-700 bg-dark-800 hover:bg-dark-700 transition-all duration-200 cursor-pointer relative}
+.calendar-day.today{@apply bg-blue-900/30 border-blue-600 ring-1 ring-blue-500/50}
+.calendar-day.has-events{@apply bg-dark-700/70}
+.event-dot{@apply absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full}
+.modal-backdrop{@apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4}
+.modal-content{@apply bg-dark-800 rounded-lg border border-dark-600 w-full max-w-md max-h-[90vh] overflow-y-auto}
+.admin-badge{@apply inline-flex items-center gap-1 px-2 py-1 bg-emerald-900/30 border border-emerald-600 rounded-full text-emerald-400 text-xs font-medium}
+.visitor-badge{@apply inline-flex items-center gap-1 px-2 py-1 bg-gray-900/30 border border-gray-600 rounded-full text-gray-400 text-xs font-medium}
+.loader{@apply w-6 h-6 border-2 border-dark-600 border-t-blue-500 rounded-full animate-spin}
