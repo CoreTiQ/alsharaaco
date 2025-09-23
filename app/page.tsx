@@ -1,3 +1,4 @@
+
 'use client'
 import { useState, useEffect } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns'
@@ -245,31 +246,29 @@ export default function Calendar() {
                 {calendarDays.map(day=>{
                   const items = dayEvents(day)
                   const inMonth = isCurrentMonth(day)
+                  const count = items.length
                   return (
                     <button
                       key={day.toISOString()}
                       onClick={()=>openDay(day)}
-                      className={`bg-dark-800 p-2 min-h-[88px] text-left transition-all hover:bg-dark-700 ${!inMonth?'opacity-40':''} ${isToday(day)?'ring-2 ring-blue-500 bg-blue-950/30':''}`}
+                      className={`bg-dark-800 p-3 min-h-[96px] text-left transition-all hover:bg-dark-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${!inMonth?'opacity-40':''} ${isToday(day)?'ring-2 ring-blue-500 bg-blue-950/30':''}`}
+                      aria-label={`يوم ${format(day,'d/MM/yyyy')} وعدد القضايا ${count}`}
                     >
-                      <div className="text-sm font-medium mb-1">{format(day,'d')}</div>
-                      {items.length>0 && (
-                        <div className="space-y-1">
-                          {items.slice(0,3).map(e=>(
-                            <div
-                              key={e.id}
-                              onClick={ev=>{ev.stopPropagation();openEventDetails(e)}}
-                              className={`text-xs px-1 py-0.5 rounded truncate cursor-pointer hover:opacity-80 ${
-                                e.status==='closed'?'bg-gray-700/50 text-gray-400':
-                                e.status==='postponed'?'bg-yellow-900/30 text-yellow-400':'bg-blue-900/30 text-blue-400'
-                              }`}
-                              title={e.title}
-                            >
-                              {e.title}
-                            </div>
-                          ))}
-                          {items.length>3 && <div className="text-xs text-gray-500">+{items.length-3} آخر</div>}
-                        </div>
-                      )}
+                      <div className="flex items-center justify-between">
+                        <div className="text-base font-semibold">{format(day,'d')}</div>
+                        {count>0 && (
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
+                            count>=5?'bg-purple-900/30 text-purple-300 border-purple-700':
+                            count>=3?'bg-yellow-900/30 text-yellow-300 border-yellow-700':
+                            'bg-blue-900/30 text-blue-300 border-blue-700'
+                          }`}>
+                            {count} قضايا
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-4 text-xs text-gray-500">
+                        {count===0?'لا قضايا': count===1?'قضية واحدة': count===2?'قضيتان': `${count} قضايا`}
+                      </div>
                     </button>
                   )
                 })}
@@ -301,11 +300,12 @@ export default function Calendar() {
                       <p>لا توجد قضايا في هذا اليوم</p>
                     </div>
                   )}
-                  {dayEvents(selectedDate).map(ev=>(
+                  {dayEvents(selectedDate).map((ev,idx)=>(
                     <div key={ev.id} className="p-4 bg-dark-700/40 rounded-lg border border-dark-600 hover:bg-dark-700/60 transition-colors">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-2">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-dark-800 border border-dark-600 text-gray-300">#{idx+1}</span>
                             <span className={`status-badge ${
                               ev.status==='closed'?'bg-gray-900/30 text-gray-400 border-gray-600':
                               ev.status==='postponed'?'bg-yellow-900/30 text-yellow-400 border-yellow-600':
@@ -313,7 +313,7 @@ export default function Calendar() {
                             }`}>
                               {ev.status==='closed'?'مغلقة':ev.status==='postponed'?'مؤجلة':'مفتوحة'}
                             </span>
-                            <h5 className="font-semibold text-blue-400">{ev.title}</h5>
+                            <h5 className="font-semibold text-blue-400 truncate">{ev.title}</h5>
                           </div>
                           {ev.court_name && <p className="text-sm text-gray-400 mb-1">المحكمة: {ev.court_name}</p>}
                           {ev.lawyers && ev.lawyers.length>0 && (
@@ -347,8 +347,8 @@ export default function Calendar() {
                     <input value={newEvent.lawyers} onChange={e=>setNewEvent({...newEvent,lawyers:e.target.value})} placeholder="أسماء المحامين (مفصولة بفاصلة)" className="w-full p-3 rounded-lg border"/>
                     <textarea value={newEvent.description} onChange={e=>setNewEvent({...newEvent,description:e.target.value})} placeholder="وصف مختصر للقضية" rows={3} className="w-full p-3 rounded-lg border"/>
                     <textarea value={newEvent.long_description} onChange={e=>setNewEvent({...newEvent,long_description:e.target.value})} placeholder="تفاصيل إضافية" rows={4} className="w-full p-3 rounded-lg border"/>
-                    <button onClick={handleCreateEvent} disabled={!newEvent.title || addingEvent} className="btn-primary w-full disabled:opacity-50">{addingEvent?'جاري الإضافة...':'إضافة القضية'}</button>
-                    <p className="text-xs text-gray-500 text-center">النموذج يبقى مفتوحاً لإضافة قضايا أخرى في نفس اليوم</p>
+                    <button onClick={handleCreateEvent} disabled={!newEvent.title || addingEvent} className="btn-primary w-full disabled:opacity-50">{addingEvent?'جارٍ الإضافة...':'إضافة القضية'}</button>
+                    <p className="text-xs text-gray-500 text-center">يبقى النموذج مفتوحاً لإضافة قضايا أخرى في نفس اليوم</p>
                   </div>
                 </div>
               )}
@@ -518,3 +518,4 @@ export default function Calendar() {
     </div>
   )
 }
+
