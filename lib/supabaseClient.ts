@@ -5,6 +5,19 @@ export type Event = {
   date: string
   title: string
   description: string | null
+  long_description: string | null
+  court_name: string | null
+  lawyers: string[] | null
+  status: "open" | "postponed" | "closed"
+  postponed_to: string | null
+  case_ref: string
+  created_at: string
+}
+
+export type EventLog = {
+  id: string
+  case_ref: string
+  message: string
   created_at: string
 }
 
