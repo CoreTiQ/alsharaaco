@@ -331,7 +331,8 @@ export default function MobileCalendar() {
         .order('created_at', { ascending: false })
       if (error) throw error
       setEvents(data || [])
-    } catch {
+    } catch (error: any) {
+      console.error('Fetch events error:', error)
       toast.error('فشل تحميل البيانات')
     } finally {
       setLoading(false)
@@ -391,14 +392,17 @@ export default function MobileCalendar() {
         .select()
       if (error) throw error
       setEvents(prev => [...prev, ...(data || [])])
+      
       if (newEvent.court_name.trim()) pushMRU('mru:courts', newEvent.court_name.trim())
       if (newEvent.reviewer.trim()) pushMRU('mru:reviewers', newEvent.reviewer.trim())
       newEvent.lawyers.forEach(lawyer => {
         if (lawyer.trim()) pushMRU('mru:lawyers', lawyer.trim())
       })
+      
       setNewEvent({ title: '', court_name: '', lawyers: [], reviewer: '', description: '', long_description: '' })
       toast.success('تمت إضافة القضية بنجاح')
-    } catch {
+    } catch (error: any) {
+      console.error('Create event error:', error)
       toast.error('فشلت الإضافة')
     } finally {
       setAddingEvent(false)
@@ -407,64 +411,136 @@ export default function MobileCalendar() {
 
   const handleUpdateEvent = async () => {
     if (!selectedEvent || !authStatus.isLoggedIn) return
+    
     try {
+      console.log('Updating event:', selectedEvent.id)
+      console.log('Update data:', editData)
+      
+      // التأكد من صحة البيانات
+      const updateData = {
+        title: editData.title?.trim() || '',
+        court_name: editData.court_name?.trim() || null,
+        lawyers: editData.lawyers && editData.lawyers.length > 0 ? editData.lawyers : null,
+        reviewer: editData.reviewer?.trim() || null,
+        description: editData.description?.trim() || null,
+        long_description: editData.long_description?.trim() || null
+      }
+      
+      // التأكد من وجود العنوان
+      if (!updateData.title) {
+        toast.error('عنوان القضية مطلوب')
+        return
+      }
+      
+      console.log('Sanitized update data:', updateData)
+      
       const { data, error } = await supabase
         .from('events')
-        .update({
-          title: editData.title,
-          court_name: editData.court_name || null,
-          lawyers: editData.lawyers.length ? editData.lawyers : null,
-          reviewer: editData.reviewer || null,
-          description: editData.description || null,
-          long_description: editData.long_description || null
-        })
+        .update(updateData)
         .eq('id', selectedEvent.id)
         .select()
-      if (error) throw error
+      
+      if (error) {
+        console.error('Update error details:', error)
+        throw new Error(`خطأ في التحديث: ${error.message}`)
+      }
+      
+      console.log('Update successful:', data)
+      
       const updated = data?.[0]
       if (updated) {
         setEvents(prev => prev.map(e => (e.id === selectedEvent.id ? updated : e)))
         setSelectedEvent(updated)
-        if (editData.court_name.trim()) pushMRU('mru:courts', editData.court_name.trim())
-        if (editData.reviewer.trim()) pushMRU('mru:reviewers', editData.reviewer.trim())
-        editData.lawyers.forEach(lawyer => {
-          if (lawyer.trim()) pushMRU('mru:lawyers', lawyer.trim())
-        })
+        
+        // حفظ في MRU lists
+        if (updateData.court_name) {
+          pushMRU('mru:courts', updateData.court_name)
+        }
+        if (updateData.reviewer) {
+          pushMRU('mru:reviewers', updateData.reviewer)
+        }
+        if (updateData.lawyers) {
+          updateData.lawyers.forEach((lawyer: string) => {
+            if (lawyer.trim()) pushMRU('mru:lawyers', lawyer.trim())
+          })
+        }
       }
+      
       setEditMode(false)
-      toast.success('تم التحديث')
-    } catch {
-      toast.error('فشل التحديث')
+      toast.success('تم التحديث بنجاح')
+      
+    } catch (error: any) {
+      console.error('Update failed:', error)
+      toast.error(error.message || 'فشل التحديث')
     }
   }
 
   const handlePostpone = async () => {
     if (!postponingEvent || !postponeDate || !authStatus.isLoggedIn) return
+    
     try {
-      const { error: updateError } = await supabase.from('events').update({ status: 'postponed', postponed_to: postponeDate }).eq('id', postponingEvent.id)
-      if (updateError) throw updateError
-      const { error } = await supabase
+      console.log('Original postponeDate:', postponeDate)
+      
+      // تأكد من صيغة التاريخ
+      const validDate = new Date(postponeDate)
+      if (isNaN(validDate.getTime())) {
+        toast.error('صيغة التاريخ غير صحيحة')
+        return
+      }
+      
+      const formattedDate = format(validDate, 'yyyy-MM-dd')
+      console.log('Formatted date:', formattedDate)
+      
+      // الخطوة الأولى: تحديث القضية الحالية
+      const { error: updateError } = await supabase
         .from('events')
-        .insert([
-          {
-            date: postponeDate,
-            title: postponingEvent.title,
-            court_name: postponingEvent.court_name,
-            lawyers: postponingEvent.lawyers,
-            reviewer: postponingEvent.reviewer,
-            description: postponingEvent.description,
-            long_description: postponingEvent.long_description,
-            status: 'open',
-            case_ref: postponingEvent.case_ref
-          }
-        ])
-      if (error) throw error
+        .update({ 
+          status: 'postponed', 
+          postponed_to: formattedDate 
+        })
+        .eq('id', postponingEvent.id)
+      
+      if (updateError) {
+        console.error('Update error details:', updateError)
+        throw new Error(`خطأ في تحديث القضية: ${updateError.message}`)
+      }
+      
+      // الخطوة الثانية: إنشاء قضية جديدة بالتاريخ الجديد
+      const newEventData = {
+        date: formattedDate,
+        title: postponingEvent.title,
+        court_name: postponingEvent.court_name || null,
+        lawyers: postponingEvent.lawyers || null,
+        reviewer: postponingEvent.reviewer || null,
+        description: postponingEvent.description || null,
+        long_description: postponingEvent.long_description || null,
+        status: 'open',
+        case_ref: postponingEvent.case_ref
+      }
+      
+      console.log('New event data:', newEventData)
+      
+      const { error: insertError } = await supabase
+        .from('events')
+        .insert([newEventData])
+      
+      if (insertError) {
+        console.error('Insert error details:', insertError)
+        throw new Error(`خطأ في إنشاء القضية الجديدة: ${insertError.message}`)
+      }
+      
+      // إعادة تحميل الأحداث
       await fetchEvents()
+      
+      // إغلاق النموذج وإعادة تعيين القيم
       setPostponingEvent(null)
       setPostponeDate('')
-      toast.success('تم التأجيل')
-    } catch {
-      toast.error('فشل التأجيل')
+      
+      toast.success('تم التأجيل بنجاح')
+      
+    } catch (error: any) {
+      console.error('Postpone failed:', error)
+      toast.error(error.message || 'فشل التأجيل')
     }
   }
 
@@ -479,7 +555,8 @@ export default function MobileCalendar() {
         if (selectedEvent?.id === event.id) setSelectedEvent(updated)
       }
       toast.success(newStatus === 'closed' ? 'تم إغلاق القضية' : 'تم إعادة فتح القضية')
-    } catch {
+    } catch (error: any) {
+      console.error('Status change error:', error)
       toast.error('فشل التحديث')
     }
   }
@@ -492,7 +569,8 @@ export default function MobileCalendar() {
       setEvents(prev => prev.filter(e => e.id !== event.id))
       if (selectedEvent?.id === event.id) setSelectedEvent(null)
       toast.success('تم الحذف')
-    } catch {
+    } catch (error: any) {
+      console.error('Delete error:', error)
       toast.error('فشل الحذف')
     }
   }
@@ -509,58 +587,75 @@ export default function MobileCalendar() {
       if (added) setLogs(prev => ({ ...prev, [selectedEvent.case_ref]: [...(prev[selectedEvent.case_ref] || []), added] }))
       setNoteText('')
       toast.success('تمت إضافة الملاحظة')
-    } catch {
+    } catch (error: any) {
+      console.error('Add note error:', error)
       toast.error('فشل إضافة الملاحظة')
     }
   }
 
   const getLawyerSuggestions: SuggestFetcher = async q => {
-    const { data } = await supabase.from('events').select('lawyers').not('lawyers', 'is', null).order('created_at', { ascending: false }).limit(1000)
-    const vals: string[] = []
-    ;(data || []).forEach(r => {
-      const arr = (r as any).lawyers as string[] | null
-      if (Array.isArray(arr)) arr.forEach(x => vals.push(x))
-    })
-    const filtered = q ? vals.filter(v => v.toLowerCase().includes(q.toLowerCase())) : vals
-    const freq = new Map<string, number>()
-    filtered.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
-    const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
-    const mru = readMRU('mru:lawyers')
-    return mergeSuggestions(dbResults, mru)
+    try {
+      const { data } = await supabase.from('events').select('lawyers').not('lawyers', 'is', null).order('created_at', { ascending: false }).limit(1000)
+      const vals: string[] = []
+      ;(data || []).forEach(r => {
+        const arr = (r as any).lawyers as string[] | null
+        if (Array.isArray(arr)) arr.forEach(x => vals.push(x))
+      })
+      
+      const filtered = q ? vals.filter(v => v.toLowerCase().includes(q.toLowerCase())) : vals
+      const freq = new Map<string, number>()
+      filtered.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
+      const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
+      const mru = readMRU('mru:lawyers')
+      return mergeSuggestions(dbResults, mru)
+    } catch (error) {
+      console.error('Lawyer suggestions error:', error)
+      return readMRU('mru:lawyers')
+    }
   }
 
   const getCourtSuggestions: SuggestFetcher = async q => {
-    const ilike = q ? `%${q}%` : '%'
-    const { data } = await supabase
-      .from('events')
-      .select('court_name')
-      .not('court_name', 'is', null)
-      .ilike('court_name', ilike)
-      .order('created_at', { ascending: false })
-      .limit(1000)
-    const vals = (data || []).map(r => String((r as any).court_name))
-    const freq = new Map<string, number>()
-    vals.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
-    const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
-    const mru = readMRU('mru:courts')
-    return mergeSuggestions(dbResults, mru)
+    try {
+      const ilike = q ? `%${q}%` : '%'
+      const { data } = await supabase
+        .from('events')
+        .select('court_name')
+        .not('court_name', 'is', null)
+        .ilike('court_name', ilike)
+        .order('created_at', { ascending: false })
+        .limit(1000)
+      const vals = (data || []).map(r => String((r as any).court_name))
+      const freq = new Map<string, number>()
+      vals.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
+      const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
+      const mru = readMRU('mru:courts')
+      return mergeSuggestions(dbResults, mru)
+    } catch (error) {
+      console.error('Court suggestions error:', error)
+      return readMRU('mru:courts')
+    }
   }
 
   const getReviewerSuggestions: SuggestFetcher = async q => {
-    const ilike = q ? `%${q}%` : '%'
-    const { data } = await supabase
-      .from('events')
-      .select('reviewer')
-      .not('reviewer', 'is', null)
-      .ilike('reviewer', ilike)
-      .order('created_at', { ascending: false })
-      .limit(1000)
-    const vals = (data || []).map(r => String((r as any).reviewer))
-    const freq = new Map<string, number>()
-    vals.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
-    const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
-    const mru = readMRU('mru:reviewers')
-    return mergeSuggestions(dbResults, mru)
+    try {
+      const ilike = q ? `%${q}%` : '%'
+      const { data } = await supabase
+        .from('events')
+        .select('reviewer')
+        .not('reviewer', 'is', null)
+        .ilike('reviewer', ilike)
+        .order('created_at', { ascending: false })
+        .limit(1000)
+      const vals = (data || []).map(r => String((r as any).reviewer))
+      const freq = new Map<string, number>()
+      vals.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
+      const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
+      const mru = readMRU('mru:reviewers')
+      return mergeSuggestions(dbResults, mru)
+    } catch (error) {
+      console.error('Reviewer suggestions error:', error)
+      return readMRU('mru:reviewers')
+    }
   }
 
   const handleLogout = () => {
@@ -639,6 +734,7 @@ export default function MobileCalendar() {
         </div>
       </main>
 
+      {/* Day Modal */}
       {showDayModal && selectedDate && (
         <div className="mobile-modal-backdrop" onClick={() => { setShowDayModal(false); setSelectedDate(null) }}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
@@ -784,6 +880,7 @@ export default function MobileCalendar() {
         </div>
       )}
 
+      {/* Event Details Modal */}
       {selectedEvent && (
         <div className="mobile-modal-backdrop" onClick={() => setSelectedEvent(null)}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
@@ -987,6 +1084,7 @@ export default function MobileCalendar() {
         </div>
       )}
 
+      {/* Postpone Modal */}
       {postponingEvent && (
         <div className="mobile-modal-backdrop" onClick={() => setPostponingEvent(null)}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
