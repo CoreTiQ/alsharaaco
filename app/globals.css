@@ -3,9 +3,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===== CSS Variables ===== */
+/* ===== CSS Variables - Enhanced Mobile ===== */
 :root {
-  /* Colors */
+  /* Colors - Enhanced for better mobile visibility */
   --color-primary-50: #eff6ff;
   --color-primary-100: #dbeafe;
   --color-primary-200: #bfdbfe;
@@ -17,6 +17,7 @@
   --color-primary-800: #1e40af;
   --color-primary-900: #1e3a8a;
   
+  /* Enhanced dark colors for better contrast */
   --color-dark-50: #f8fafc;
   --color-dark-100: #f1f5f9;
   --color-dark-200: #e2e8f0;
@@ -24,58 +25,47 @@
   --color-dark-400: #94a3b8;
   --color-dark-500: #64748b;
   --color-dark-600: #475569;
-  --color-dark-700: #334155;
-  --color-dark-800: #1e293b;
-  --color-dark-900: #0f172a;
-  --color-dark-950: #020617;
+  --color-dark-700: #374151; /* Lighter for better visibility */
+  --color-dark-800: #1f2937; /* Lighter */
+  --color-dark-900: #111827; /* Lighter */
+  --color-dark-950: #030712; /* Slightly lighter */
   
-  /* Gradients */
+  /* Enhanced gradients for mobile */
   --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  --gradient-dark: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 50%, #0c0c0c 100%);
-  --gradient-surface: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
+  --gradient-dark: linear-gradient(135deg, #111827 0%, #1f2937 50%, #111827 100%);
+  --gradient-surface: linear-gradient(145deg, #1f2937 0%, #111827 100%);
   
-  /* Shadows */
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
-  --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
-  --shadow-glow: 0 0 20px rgb(59 130 246 / 0.15);
-  --shadow-glow-strong: 0 0 30px rgb(59 130 246 / 0.3);
+  /* Enhanced shadows for mobile */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.1);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.15), 0 1px 2px -1px rgb(0 0 0 / 0.15);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.15), 0 2px 4px -2px rgb(0 0 0 / 0.15);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.2), 0 4px 6px -4px rgb(0 0 0 / 0.15);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.2), 0 8px 10px -6px rgb(0 0 0 / 0.15);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.35);
+  --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.1);
+  --shadow-glow: 0 0 25px rgb(59 130 246 / 0.25);
+  --shadow-glow-strong: 0 0 35px rgb(59 130 246 / 0.4);
   
-  /* Transitions */
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-bounce: 600ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  /* Mobile-optimized transitions */
+  --transition-fast: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 550ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 650ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
   
-  /* Spacing */
-  --spacing-xs: 0.25rem;
-  --spacing-sm: 0.5rem;
-  --spacing-md: 1rem;
-  --spacing-lg: 1.5rem;
-  --spacing-xl: 2rem;
-  --spacing-2xl: 3rem;
+  /* Mobile spacing */
+  --spacing-mobile-xs: 0.375rem;
+  --spacing-mobile-sm: 0.75rem;
+  --spacing-mobile-md: 1.25rem;
+  --spacing-mobile-lg: 1.75rem;
+  --spacing-mobile-xl: 2.5rem;
   
-  /* Border Radius */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.5rem;
-  --radius-full: 9999px;
-  
-  /* Z-Index */
-  --z-dropdown: 10;
-  --z-sticky: 20;
-  --z-fixed: 30;
-  --z-modal: 40;
-  --z-popover: 50;
-  --z-tooltip: 60;
-  --z-toast: 70;
+  /* Mobile border radius */
+  --radius-mobile-sm: 0.5rem;
+  --radius-mobile-md: 0.75rem;
+  --radius-mobile-lg: 1rem;
+  --radius-mobile-xl: 1.25rem;
+  --radius-mobile-2xl: 1.75rem;
 }
 
 /* ===== Base Layer ===== */
@@ -544,12 +534,27 @@
   .skeleton-avatar { @apply w-12 h-12 rounded-full; }
   .skeleton-button { @apply h-10 w-24 rounded-lg; }
   
-  /* ===== Calendar Components ===== */
+  /* ===== Calendar Components - Enhanced Mobile ===== */
   .day-cell {
-    @apply bg-dark-800/60 p-2 text-left transition-all duration-300 hover:bg-dark-700/80 relative rounded-lg border border-dark-700/30;
+    @apply bg-dark-800/80 p-3 sm:p-2 text-left transition-all duration-300 hover:bg-dark-700/90 relative rounded-lg border border-dark-700/50;
     backdrop-filter: blur(4px);
     position: relative;
     overflow: hidden;
+    min-height: 56px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+  
+  @media (min-width: 640px) {
+    .day-cell {
+      min-height: 88px;
+      font-size: 0.875rem;
+      padding: 0.5rem;
+    }
   }
   
   .day-cell::before {
@@ -559,7 +564,7 @@
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.15), transparent);
     transition: left 0.6s;
   }
   
@@ -573,29 +578,102 @@
     border-color: var(--color-dark-600);
   }
   
-  .day-cell-minh { @apply min-h-[74px] sm:min-h-[88px]; }
+  .day-cell-minh { 
+    @apply min-h-[56px] sm:min-h-[88px]; 
+  }
   
   .day-today {
-    @apply ring-2 ring-blue-500/50 bg-blue-950/40;
+    @apply ring-2 ring-blue-500/70 bg-blue-950/50 border-blue-500/30;
     box-shadow: var(--shadow-glow);
   }
   
-  .day-other-month { @apply opacity-40; }
+  .day-other-month { 
+    @apply opacity-30; 
+  }
   
   .day-has-events {
-    @apply bg-dark-700/60;
+    @apply bg-dark-700/70 border-blue-500/20;
   }
   
   .day-has-events::after {
     content: '';
     position: absolute;
-    bottom: 2px;
-    right: 2px;
-    width: 6px;
-    height: 6px;
-    background: var(--color-primary-500);
+    bottom: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    background: var(--color-primary-400);
     border-radius: 50%;
     animation: pulse-dot 2s infinite;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+  }
+  
+  /* Calendar grid improvements for mobile */
+  .calendar-grid {
+    @apply grid grid-cols-7 gap-1 bg-dark-700/30 rounded-xl overflow-hidden p-2;
+  }
+  
+  @media (min-width: 640px) {
+    .calendar-grid {
+      gap: 1px;
+      padding: 0;
+    }
+  }
+  
+  /* Calendar header days */
+  .calendar-header-day {
+    @apply bg-dark-800/80 px-2 py-3 text-center text-sm font-semibold text-gray-300 border-b border-dark-600/50;
+    backdrop-filter: blur(4px);
+  }
+  
+  @media (min-width: 640px) {
+    .calendar-header-day {
+      padding: 0.75rem 0.5rem;
+    }
+  }
+  
+  /* Calendar container improvements */
+  .calendar-container {
+    @apply bg-dark-800/60 backdrop-blur rounded-2xl shadow-xl border border-dark-700/60 overflow-hidden;
+  }
+  
+  .calendar-nav {
+    @apply bg-dark-900/60 px-4 py-4 border-b border-dark-700/60 flex items-center justify-between;
+    backdrop-filter: blur(8px);
+  }
+  
+  .calendar-nav-button {
+    @apply p-3 hover:bg-dark-700/60 rounded-xl transition-all duration-200;
+    min-width: 48px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .calendar-nav-button:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+  
+  .calendar-title {
+    @apply text-xl font-bold text-gray-100;
+  }
+  
+  @media (min-width: 640px) {
+    .calendar-title {
+      @apply text-2xl;
+    }
+    
+    .calendar-nav {
+      @apply px-6 py-4;
+    }
+    
+    .calendar-nav-button {
+      @apply p-2;
+      min-width: 40px;
+      min-height: 40px;
+    }
   }
   
   /* ===== Enhanced Cards ===== */
@@ -744,25 +822,141 @@
     animation: bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   }
   
-  /* ===== Responsive Utilities ===== */
-  .container-fluid {
-    @apply w-full max-w-none px-4 sm:px-6 lg:px-8;
+  /* ===== Mobile-First Layout Improvements ===== */
+  .app-header {
+    @apply mb-6 px-1;
   }
   
-  .container-sm {
-    @apply w-full max-w-2xl mx-auto px-4;
+  .app-title {
+    @apply text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-500 to-blue-600 bg-clip-text text-transparent;
+    background-size: 200% auto;
+    animation: gradient-shift 3s ease-in-out infinite;
   }
   
-  .container-md {
-    @apply w-full max-w-4xl mx-auto px-4;
+  .header-actions {
+    @apply flex items-center gap-3;
   }
   
-  .container-lg {
-    @apply w-full max-w-6xl mx-auto px-4;
+  .header-actions .status-badge {
+    @apply px-3 py-2 text-sm font-semibold;
   }
   
-  .container-xl {
-    @apply w-full max-w-7xl mx-auto px-4;
+  .main-container {
+    @apply max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6;
+  }
+  
+  /* ===== Enhanced Container System ===== */
+  .page-container {
+    @apply min-h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950;
+    position: relative;
+  }
+  
+  .page-container::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+      radial-gradient(circle at 25% 25%, rgb(59 130 246 / 0.08) 0%, transparent 50%),
+      radial-gradient(circle at 75% 75%, rgb(147 51 234 / 0.06) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+  }
+  
+  /* ===== Mobile Typography Improvements ===== */
+  @media (max-width: 640px) {
+    html {
+      font-size: 16px;
+    }
+    
+    h1, .app-title {
+      @apply text-2xl leading-tight;
+      letter-spacing: -0.02em;
+    }
+    
+    h2 {
+      @apply text-xl;
+    }
+    
+    h3 {
+      @apply text-lg;
+    }
+    
+    .calendar-title {
+      @apply text-xl;
+    }
+    
+    /* Better text contrast for mobile */
+    .day-cell {
+      color: rgb(248 250 252);
+    }
+    
+    .calendar-header-day {
+      color: rgb(226 232 240);
+      font-weight: 600;
+    }
+  }
+  
+  /* ===== Touch Target Improvements ===== */
+  @media (pointer: coarse) {
+    .btn-base,
+    .btn-icon,
+    .field,
+    .day-cell,
+    .calendar-nav-button {
+      min-height: 48px;
+      min-width: 48px;
+    }
+    
+    .day-cell {
+      min-height: 64px;
+      padding: 0.875rem;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    
+    .calendar-header-day {
+      padding: 1rem 0.5rem;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+    
+    /* Larger touch targets for navigation */
+    .calendar-nav-button {
+      min-height: 52px;
+      min-width: 52px;
+      padding: 1rem;
+    }
+    
+    /* Better spacing for mobile forms */
+    .field-group {
+      @apply mb-5;
+    }
+    
+    .modal-body {
+      @apply px-5 py-5;
+    }
+    
+    .modal-header,
+    .modal-footer {
+      @apply px-5 py-4;
+    }
+  }
+  
+  /* ===== Status Badge Mobile Improvements ===== */
+  .status-badge {
+    @apply inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 border;
+    backdrop-filter: blur(4px);
+    min-height: 32px;
+  }
+  
+  @media (max-width: 640px) {
+    .status-badge {
+      @apply px-4 py-2 text-sm;
+      min-height: 36px;
+    }
   }
   
   /* ===== Print Styles ===== */
