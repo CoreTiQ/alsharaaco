@@ -3,9 +3,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===== Mobile-First CSS Variables ===== */
+/* ===== CSS Variables ===== */
 :root {
-  /* Mobile-optimized colors with better contrast */
+  /* Colors */
   --color-primary: #3b82f6;
   --color-primary-light: #60a5fa;
   --color-primary-dark: #1d4ed8;
@@ -29,7 +29,7 @@
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
   
-  /* Mobile spacing system */
+  /* Spacing */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -40,32 +40,31 @@
   --space-10: 2.5rem;
   --space-12: 3rem;
   
-  /* Mobile-specific sizes */
-  --mobile-touch-target: 44px;
-  --mobile-touch-target-large: 56px;
-  --mobile-header-height: 64px;
-  --mobile-nav-height: 60px;
+  /* Sizes */
+  --touch-target: 44px;
+  --touch-target-large: 56px;
+  --header-height: 64px;
   
-  /* Border radius for mobile */
+  /* Border Radius */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
   --radius-2xl: 20px;
   
-  /* Shadows optimized for mobile */
+  /* Shadows */
   --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.1);
   --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.15);
   --shadow-strong: 0 8px 32px rgba(0, 0, 0, 0.2);
   --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
   
-  /* Transitions for mobile */
+  /* Transitions */
   --transition-fast: 150ms ease-out;
   --transition-normal: 250ms ease-out;
   --transition-slow: 400ms ease-out;
 }
 
-/* ===== Base Layer - Mobile First ===== */
+/* ===== Base Layer ===== */
 @layer base {
   * {
     box-sizing: border-box;
@@ -91,28 +90,30 @@
       radial-gradient(circle at 80% 80%, rgba(147, 51, 234, 0.08) 0%, transparent 50%);
     background-attachment: fixed;
     min-height: 100vh;
-    min-height: 100dvh; /* Dynamic viewport height for mobile */
+    min-height: 100dvh;
     overflow-x: hidden;
     font-variant-numeric: tabular-nums;
   }
   
-  /* Typography optimized for mobile screens */
   h1 { 
     font-size: 1.75rem; 
     font-weight: 700; 
     line-height: 1.2;
     letter-spacing: -0.025em;
   }
+  
   h2 { 
     font-size: 1.5rem; 
     font-weight: 600; 
     line-height: 1.3;
   }
+  
   h3 { 
     font-size: 1.25rem; 
     font-weight: 600; 
     line-height: 1.4;
   }
+  
   h4 { 
     font-size: 1.125rem; 
     font-weight: 600; 
@@ -123,10 +124,9 @@
     color: var(--color-text-secondary);
   }
   
-  /* Form elements optimized for mobile */
   input, textarea, select {
     font-family: inherit;
-    font-size: 16px; /* Prevents zoom on iOS */
+    font-size: 16px;
     line-height: 1.5;
   }
   
@@ -137,17 +137,16 @@
     user-select: none;
   }
   
-  /* Better text selection on mobile */
   ::selection {
     background-color: rgba(59, 130, 246, 0.3);
     color: var(--color-text);
   }
 }
 
-/* ===== Component Layer - Mobile Optimized ===== */
+/* ===== Component Layer ===== */
 @layer components {
   
-  /* ===== Mobile App Layout - ENHANCED ===== */
+  /* ===== App Layout ===== */
   .mobile-app {
     min-height: 100vh;
     min-height: 100dvh;
@@ -157,8 +156,8 @@
   }
   
   .mobile-header {
-    height: var(--mobile-header-height);
-    padding: var(--space-4) var(--space-4);
+    height: var(--header-height);
+    padding: var(--space-4);
     background: rgba(30, 41, 59, 0.95);
     backdrop-filter: blur(16px);
     border-bottom: 1px solid rgba(100, 116, 139, 0.3);
@@ -193,7 +192,6 @@
     -webkit-overflow-scrolling: touch;
   }
   
-  /* Enhanced header actions */
   .header-actions {
     display: flex;
     align-items: center;
@@ -211,7 +209,7 @@
     min-height: 36px;
   }
   
-  /* ===== Mobile Calendar Container - ENHANCED ===== */
+  /* ===== Calendar Container ===== */
   .mobile-calendar {
     background: rgba(30, 41, 59, 0.6);
     backdrop-filter: blur(16px);
@@ -236,8 +234,8 @@
   }
   
   .mobile-calendar-nav-btn {
-    width: var(--mobile-touch-target-large);
-    height: var(--mobile-touch-target-large);
+    width: var(--touch-target-large);
+    height: var(--touch-target-large);
     border-radius: var(--radius-lg);
     background: rgba(51, 65, 85, 0.6);
     backdrop-filter: blur(4px);
@@ -267,32 +265,7 @@
     min-width: 0;
   }
   
-  /* Ensure full calendar visibility */
-  .mobile-calendar-grid-container {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  
-  .mobile-calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(40px, 1fr));
-    gap: var(--space-1);
-    background: rgba(15, 23, 42, 0.3);
-    padding: var(--space-2);
-    border-radius: var(--radius-xl);
-    width: 100%;
-    min-width: 100%;
-    box-sizing: border-box;
-  }
-  
-  /* Ensure all calendar items are visible */
-  .mobile-calendar-item {
-    min-width: 40px;
-    box-sizing: border-box;
-  }
-  
-  /* ===== Mobile Calendar Grid - FIT ALL COLUMNS ===== */
+  /* ===== Calendar Grid ===== */
   .mobile-calendar-content {
     padding: var(--space-1);
     overflow: visible;
@@ -408,7 +381,7 @@
     max-width: 100%;
   }
   
-  /* Calendar day states - COMPACT */
+  /* Calendar Day States */
   .mobile-calendar-day.today {
     background: rgba(59, 130, 246, 0.3);
     border-color: #3b82f6;
@@ -455,9 +428,9 @@
     box-shadow: 0 0 6px #60a5fa;
   }
   
-  /* ===== Mobile Button System ===== */
+  /* ===== Button System ===== */
   .mobile-btn {
-    min-height: var(--mobile-touch-target);
+    min-height: var(--touch-target);
     padding: var(--space-3) var(--space-6);
     border-radius: var(--radius-lg);
     font-weight: 600;
@@ -531,19 +504,19 @@
   }
   
   .mobile-btn-lg {
-    min-height: var(--mobile-touch-target-large);
+    min-height: var(--touch-target-large);
     padding: var(--space-4) var(--space-8);
     font-size: 1.0625rem;
   }
   
   .mobile-btn-icon {
-    width: var(--mobile-touch-target);
-    height: var(--mobile-touch-target);
+    width: var(--touch-target);
+    height: var(--touch-target);
     padding: 0;
     border-radius: var(--radius-lg);
   }
   
-  /* ===== Mobile Status Badge ===== */
+  /* ===== Status Badge ===== */
   .mobile-status-badge {
     display: inline-flex;
     align-items: center;
@@ -586,7 +559,7 @@
     border-color: rgba(107, 114, 128, 0.4);
   }
   
-  /* ===== Mobile Modal System - FULLY OPTIMIZED ===== */
+  /* ===== Modal System - موحد لجميع الأحجام ===== */
   .mobile-modal-backdrop {
     position: fixed;
     inset: 0;
@@ -594,41 +567,28 @@
     backdrop-filter: blur(8px);
     z-index: 100;
     display: flex;
-    align-items: flex-end;
-    padding: 0;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
     animation: mobile-fade-in 0.3s ease-out;
     touch-action: none;
   }
   
   .mobile-modal {
     width: 100%;
-    max-height: 95vh;
+    max-width: 600px;
+    max-height: 90vh;
     background: var(--color-surface);
-    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+    border-radius: var(--radius-2xl);
     overflow: hidden;
     animation: mobile-slide-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     display: flex;
     flex-direction: column;
     box-shadow: 
-      0 -10px 40px rgba(0, 0, 0, 0.3),
+      0 20px 60px rgba(0, 0, 0, 0.4),
       0 0 0 1px rgba(255, 255, 255, 0.1);
     border: 1px solid var(--color-border);
-    border-bottom: none;
     position: relative;
-  }
-  
-  /* Modal handle for iOS-like experience */
-  .mobile-modal::before {
-    content: '';
-    position: absolute;
-    top: 8px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 36px;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 2px;
-    z-index: 10;
   }
   
   .mobile-modal-header {
@@ -654,8 +614,8 @@
   }
   
   .mobile-modal-close {
-    width: var(--mobile-touch-target);
-    height: var(--mobile-touch-target);
+    width: var(--touch-target);
+    height: var(--touch-target);
     border-radius: var(--radius-lg);
     background: rgba(51, 65, 85, 0.8);
     border: 1px solid var(--color-border);
@@ -667,6 +627,7 @@
     flex-shrink: 0;
   }
   
+  .mobile-modal-close:hover,
   .mobile-modal-close:active {
     transform: scale(0.95);
     background: var(--color-surface-light);
@@ -690,70 +651,17 @@
     flex-shrink: 0;
   }
   
-  /* Tablet and larger screens */
-  @media (min-width: 768px) {
-    .mobile-modal-backdrop {
-      align-items: center;
-      justify-content: center;
-      padding: var(--space-8);
-    }
-    
-    .mobile-modal {
-      width: auto;
-      min-width: 400px;
-      max-width: 600px;
-      max-height: 85vh;
-      border-radius: var(--radius-2xl);
-      border: 1px solid var(--color-border);
-      margin: auto;
-    }
-    
-    .mobile-modal::before {
-      display: none;
-    }
-    
-    .mobile-modal-footer {
-      padding-bottom: var(--space-4);
-    }
-  }
-  
-  /* Landscape phones */
-  @media (orientation: landscape) and (max-height: 500px) {
-    .mobile-modal {
-      max-height: 90vh;
-      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    }
-    
-    .mobile-modal-header {
-      padding: var(--space-3) var(--space-5) var(--space-2);
-      min-height: 48px;
-    }
-    
-    .mobile-modal-title {
-      font-size: 1.0625rem;
-    }
-    
-    .mobile-modal-body {
-      padding: var(--space-4);
-    }
-    
-    .mobile-modal-footer {
-      padding: var(--space-3) var(--space-5);
-      padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
-    }
-  }
-  
-  /* ===== Mobile Form Elements ===== */
+  /* ===== Form Elements ===== */
   .mobile-field {
     width: 100%;
-    min-height: var(--mobile-touch-target);
+    min-height: var(--touch-target);
     padding: var(--space-4);
     background: rgba(30, 41, 59, 0.8);
     backdrop-filter: blur(8px);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     color: var(--color-text);
-    font-size: 16px; /* Prevents zoom on iOS */
+    font-size: 16px;
     line-height: 1.4;
     transition: all var(--transition-normal);
   }
@@ -793,7 +701,7 @@
     font-family: inherit;
   }
   
-  /* ===== Mobile Autocomplete ===== */
+  /* ===== Autocomplete ===== */
   .mobile-autocomplete {
     position: relative;
   }
@@ -818,7 +726,7 @@
   
   .mobile-autocomplete-item {
     width: 100%;
-    min-height: var(--mobile-touch-target);
+    min-height: var(--touch-target);
     padding: var(--space-3) var(--space-4);
     text-align: right;
     font-size: 0.9375rem;
@@ -834,14 +742,15 @@
     border-bottom: none;
   }
   
+  .mobile-autocomplete-item:hover,
   .mobile-autocomplete-item:active {
     background: rgba(59, 130, 246, 0.1);
     color: var(--color-text);
   }
   
-  /* ===== Mobile Token Input ===== */
+  /* ===== Token Input ===== */
   .mobile-token-input {
-    min-height: var(--mobile-touch-target);
+    min-height: var(--touch-target);
     padding: var(--space-2);
     background: rgba(30, 41, 59, 0.8);
     backdrop-filter: blur(8px);
@@ -889,6 +798,7 @@
     transition: background-color var(--transition-fast);
   }
   
+  .mobile-token-remove:hover,
   .mobile-token-remove:active {
     background: rgba(255, 255, 255, 0.3);
   }
@@ -901,14 +811,14 @@
     border: none;
     outline: none;
     color: var(--color-text);
-    font-size: 16px; /* Prevents zoom on iOS */
+    font-size: 16px;
   }
   
   .mobile-token-input-field::placeholder {
     color: var(--color-text-muted);
   }
   
-  /* ===== Mobile Loading States ===== */
+  /* ===== Loading States ===== */
   .mobile-loader {
     width: 32px;
     height: 32px;
@@ -930,7 +840,7 @@
   }
 }
 
-/* ===== Mobile Specific Utilities ===== */
+/* ===== Utilities ===== */
 @layer utilities {
   .mobile-safe-top {
     padding-top: env(safe-area-inset-top);
@@ -952,7 +862,6 @@
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
   }
-  
   .mobile-no-scroll {
     overflow: hidden;
     position: fixed;
@@ -965,7 +874,7 @@
   }
 }
 
-/* ===== Mobile Animations ===== */
+/* ===== Animations ===== */
 @keyframes mobile-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -974,7 +883,7 @@
 @keyframes mobile-slide-up {
   from { 
     opacity: 0;
-    transform: translateY(100%);
+    transform: translateY(20px);
   }
   to { 
     opacity: 1;
@@ -1003,10 +912,15 @@
   }
 }
 
-/* ===== Enhanced Scrollbar for Mobile ===== */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* ===== Scrollbar Styling ===== */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -1015,38 +929,82 @@
 
 ::-webkit-scrollbar-thumb {
   background: rgba(100, 116, 139, 0.5);
-  border-radius: 2px;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
 }
 
 ::-webkit-scrollbar-thumb:active {
   background: rgba(100, 116, 139, 0.8);
 }
 
-/* ===== Mobile Media Queries ===== */
+/* ===== Media Queries ===== */
 
-/* Large mobile devices */
-@media (min-width: 414px) {
+/* Mobile Small (< 375px) */
+@media (max-width: 374px) {
+  :root {
+    --touch-target: 40px;
+    --touch-target-large: 48px;
+  }
+  
+  .mobile-header {
+    padding: var(--space-3);
+  }
+  
+  .mobile-header-title {
+    font-size: 1rem;
+  }
+  
+  .mobile-main {
+    padding: var(--space-3);
+  }
+  
   .mobile-calendar-day {
-    min-height: 68px;
+    height: 40px;
   }
   
   .mobile-calendar-day-number {
-    font-size: 1.0625rem;
+    font-size: 0.6875rem;
+  }
+  
+  .mobile-modal {
+    max-width: calc(100% - var(--space-2));
+  }
+  
+  .mobile-modal-title {
+    font-size: 1rem;
   }
 }
 
-/* Tablets in portrait */
+/* Mobile Standard (375px - 767px) */
+@media (min-width: 375px) and (max-width: 767px) {
+  .mobile-calendar-day {
+    height: 48px;
+  }
+  
+  .mobile-calendar-day-number {
+    font-size: 0.8125rem;
+  }
+}
+
+/* Tablet Portrait (768px - 1023px) */
 @media (min-width: 768px) {
   .mobile-header-title {
     font-size: 1.5rem;
   }
   
   .mobile-calendar-day {
-    min-height: 80px;
+    height: 80px;
+  }
+  
+  .mobile-calendar-day-number {
+    font-size: 1rem;
   }
   
   .mobile-calendar-grid {
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
   
   .mobile-main {
@@ -1054,82 +1012,84 @@
   }
   
   .mobile-modal {
-    margin: var(--space-8) auto;
-    max-width: 600px;
-    border-radius: var(--radius-2xl);
-    align-self: center;
+    max-width: 700px;
   }
   
-  .mobile-modal-backdrop {
-    align-items: center;
-    padding: var(--space-8);
+  .mobile-modal-title {
+    font-size: 1.375rem;
+  }
+  
+  .mobile-modal-footer {
+    padding-bottom: var(--space-5);
   }
 }
 
-/* Large screens */
+/* Desktop (1024px+) */
 @media (min-width: 1024px) {
+  .mobile-header-title {
+    font-size: 1.75rem;
+  }
+  
   .mobile-calendar-day {
-    min-height: 96px;
+    height: 96px;
+  }
+  
+  .mobile-calendar-day-number {
+    font-size: 1.125rem;
+  }
+  
+  .mobile-calendar-day-events {
+    font-size: 0.625rem;
+  }
+  
+  .mobile-calendar-grid {
+    gap: var(--space-3);
+  }
+  
+  .mobile-main {
+    padding: var(--space-8);
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  
+  .mobile-modal {
+    max-width: 800px;
+  }
+  
+  .mobile-modal-title {
+    font-size: 1.5rem;
+  }
+  
+  .mobile-calendar-nav-btn:hover {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+  }
+  
+  .mobile-btn:hover {
+    transform: translateY(-1px);
+  }
+  
+  .mobile-btn-primary:hover {
+    box-shadow: var(--shadow-glow);
+  }
+}
+
+/* Large Desktop (1440px+) */
+@media (min-width: 1440px) {
+  .mobile-main {
+    max-width: 1600px;
+  }
+  
+  .mobile-calendar-day {
+    height: 110px;
   }
   
   .mobile-calendar-grid {
     gap: var(--space-4);
   }
-  
-  .mobile-main {
-    padding: var(--space-8);
-  }
 }
 
-/* Small screens optimization */
-@media (max-width: 375px) {
-  :root {
-    --mobile-touch-target: 40px;
-    --mobile-touch-target-large: 48px;
-  }
-  
-  .mobile-header {
-    padding: var(--space-3);
-  }
-  
-  .mobile-header-title {
-    font-size: 1.1875rem;
-  }
-  
-  .mobile-main {
-    padding: var(--space-3);
-  }
-  
-  .mobile-calendar-day {
-    min-height: 52px;
-    padding: var(--space-1);
-  }
-  
-  .mobile-calendar-day-number {
-    font-size: 0.9375rem;
-  }
-  
-  .mobile-calendar-day-events {
-    font-size: 0.6875rem;
-  }
-}
-
-/* Very small screens */
-@media (max-width: 320px) {
-  .mobile-header-title {
-    font-size: 1.0625rem;
-  }
-  
-  .mobile-calendar-day {
-    min-height: 48px;
-  }
-  
-  .mobile-calendar-day-number {
-    font-size: 0.875rem;
-  }
-}
-
-/* Landscape orientation adjustments */
+/* Landscape Orientation (Mobile) */
 @media (orientation: landscape) and (max-height: 500px) {
   .mobile-header {
     height: 52px;
@@ -1137,7 +1097,7 @@
   }
   
   .mobile-header-title {
-    font-size: 1.1875rem;
+    font-size: 1.125rem;
   }
   
   .mobile-main {
@@ -1145,23 +1105,44 @@
   }
   
   .mobile-modal {
-    max-height: 80vh;
+    max-height: 85vh;
+  }
+  
+  .mobile-modal-header {
+    padding: var(--space-3) var(--space-5) var(--space-2);
+    min-height: 48px;
+  }
+  
+  .mobile-modal-title {
+    font-size: 1rem;
+  }
+  
+  .mobile-modal-body {
+    padding: var(--space-4);
+  }
+  
+  .mobile-modal-footer {
+    padding: var(--space-3) var(--space-5);
   }
   
   .mobile-calendar-day {
-    min-height: 44px;
+    height: 44px;
   }
 }
 
-/* High DPI screens */
+/* High Resolution Displays */
 @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
   .mobile-calendar-day::after {
-    width: 4px;
-    height: 4px;
+    width: 5px;
+    height: 5px;
+  }
+  
+  body {
+    -webkit-font-smoothing: subpixel-antialiased;
   }
 }
 
-/* Dark mode refinements */
+/* Dark Mode Preferences */
 @media (prefers-color-scheme: dark) {
   :root {
     --color-background: #0a0f16;
@@ -1170,18 +1151,18 @@
   }
 }
 
-/* Reduced motion support */
+/* Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
-  * {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
   
-  .mobile-calendar-day::before {
-    display: none;
-  }
-  
+  .mobile-calendar-day::before,
   .mobile-btn::before {
     display: none;
   }
@@ -1192,7 +1173,7 @@
   }
 }
 
-/* High contrast mode */
+/* High Contrast Mode */
 @media (prefers-contrast: high) {
   :root {
     --color-border: #64748b;
@@ -1200,20 +1181,18 @@
     --color-text-secondary: #f1f5f9;
   }
   
-  .mobile-btn {
-    border: 2px solid currentColor;
-  }
-  
-  .mobile-field {
-    border: 2px solid var(--color-border);
-  }
-  
+  .mobile-btn,
+  .mobile-field,
   .mobile-calendar-day {
-    border: 2px solid var(--color-border);
+    border-width: 2px;
+  }
+  
+  .mobile-status-badge {
+    border-width: 2px;
   }
 }
 
-/* iOS specific fixes */
+/* iOS Specific Fixes */
 @supports (-webkit-touch-callout: none) {
   .mobile-field {
     transform: translateZ(0);
@@ -1225,7 +1204,12 @@
     -webkit-tap-highlight-color: transparent;
   }
   
-  /* iOS Safari bottom bar compensation */
+  input[type="date"],
+  input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  
   @media screen and (max-height: 812px) {
     .mobile-modal {
       max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 20px);
@@ -1233,14 +1217,21 @@
   }
 }
 
-/* Android specific fixes */
+/* Android Specific Fixes */
 @media screen and (-webkit-min-device-pixel-ratio: 0) {
   .mobile-field {
     background-clip: padding-box;
   }
+  
+  select.mobile-field {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: left 12px center;
+    padding-right: 40px;
+  }
 }
 
-/* Foldable devices support */
+/* Foldable Devices */
 @media (screen-spanning: single-fold-vertical) {
   .mobile-main {
     display: grid;
@@ -1249,7 +1240,7 @@
   }
 }
 
-/* Print styles for mobile */
+/* Print Styles */
 @media print {
   .mobile-app {
     background: white !important;
@@ -1258,18 +1249,125 @@
   
   .mobile-header,
   .mobile-btn,
-  .mobile-modal {
+  .mobile-modal,
+  .mobile-modal-backdrop {
     display: none !important;
   }
   
   .mobile-calendar {
-    border: 1px solid black;
+    border: 2px solid black;
     box-shadow: none;
+    page-break-inside: avoid;
   }
   
   .mobile-calendar-day {
-    border: 1px solid #ccc;
+    border: 1px solid #666;
     background: white;
     color: black;
   }
+  
+  .mobile-calendar-day::before,
+  .mobile-calendar-day::after {
+    display: none;
+  }
+  
+  .mobile-main {
+    padding: 0;
+  }
+}
+
+/* Touch Device Optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .mobile-btn:hover {
+    transform: none;
+  }
+  
+  .mobile-calendar-nav-btn:hover {
+    background: rgba(51, 65, 85, 0.6);
+  }
+  
+  .mobile-autocomplete-item:hover {
+    background: transparent;
+  }
+}
+
+/* Mouse/Trackpad Device Enhancements */
+@media (hover: hover) and (pointer: fine) {
+  .mobile-btn:hover {
+    transform: translateY(-2px);
+  }
+  
+  .mobile-btn-primary:hover {
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+  }
+  
+  .mobile-calendar-day:hover {
+    transform: scale(1.05);
+    z-index: 1;
+  }
+  
+  .mobile-calendar-nav-btn:hover {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    transform: scale(1.05);
+  }
+  
+  .mobile-modal-close:hover {
+    background: var(--color-surface-light);
+    color: var(--color-text);
+    transform: rotate(90deg);
+  }
+  
+  .mobile-token-remove:hover {
+    background: rgba(255, 255, 255, 0.4);
+    transform: scale(1.1);
+  }
+  
+  .mobile-autocomplete-item:hover {
+    background: rgba(59, 130, 246, 0.15);
+  }
+}
+
+/* Ultra-Wide Screens */
+@media (min-width: 1920px) {
+  .mobile-main {
+    max-width: 1800px;
+  }
+  
+  .mobile-calendar-day {
+    height: 120px;
+  }
+  
+  .mobile-calendar-day-number {
+    font-size: 1.25rem;
+  }
+  
+  .mobile-modal {
+    max-width: 900px;
+  }
+}
+
+/* Accessibility - Focus Visible */
+:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+.mobile-btn:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+/* Screen Reader Only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
