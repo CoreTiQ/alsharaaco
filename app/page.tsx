@@ -204,31 +204,40 @@ export default function Calendar() {
     toast.success('تم تسجيل الخروج')
   }
 
+  const smallDots = (items: Event[]) => {
+    const colors = items.slice(0,3).map(e => e.status==='closed'?'bg-gray-500':e.status==='postponed'?'bg-yellow-400':'bg-blue-400')
+    return (
+      <div className="absolute bottom-2 right-2 flex gap-1 md:hidden">
+        {colors.map((c,i)=>(<span key={i} className={`w-1.5 h-1.5 rounded-full ${c}`}/>}))}
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-dark-950 to-dark-900">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <header className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">رزنامة المكتب القانوني</h1>
-            <div className="flex items-center gap-3">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        <header className="mb-4 sm:mb-8">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">رزنامة المكتب القانوني</h1>
+            <div className="flex items-center gap-2 sm:gap-3">
               {authStatus.isLoggedIn ? (
                 <>
-                  <span className="status-badge bg-green-900/30 text-green-400 border border-green-600">مدير النظام</span>
-                  <button onClick={handleLogout} className="btn-danger">خروج</button>
+                  <span className="status-badge bg-green-900/30 text-green-400 border border-green-600 hidden sm:inline-flex">مدير النظام</span>
+                  <button onClick={handleLogout} className="btn-danger px-3 py-2 sm:px-4 sm:py-2">خروج</button>
                 </>
               ) : (
-                <button onClick={()=>setShowLoginModal(true)} className="btn-primary">دخول المدير</button>
+                <button onClick={()=>setShowLoginModal(true)} className="btn-primary px-3 py-2 sm:px-4 sm:py-2">دخول المدير</button>
               )}
             </div>
           </div>
         </header>
 
         <div className="bg-dark-800/50 backdrop-blur rounded-2xl shadow-xl border border-dark-700 overflow-hidden">
-          <div className="bg-dark-900/50 px-6 py-4 border-b border-dark-700 flex items-center justify-between">
+          <div className="bg-dark-900/50 px-4 sm:px-6 py-3 sm:py-4 border-b border-dark-700 flex items-center justify-between">
             <button onClick={()=>setCurrentMonth(subMonths(currentMonth,1))} className="p-2 hover:bg-dark-700 rounded-lg transition-colors">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
             </button>
-            <h2 className="text-xl font-bold">{format(currentMonth,'MMMM yyyy',{locale:ar})}</h2>
+            <h2 className="text-lg sm:text-xl font-bold">{format(currentMonth,'MMMM yyyy',{locale:ar})}</h2>
             <button onClick={()=>setCurrentMonth(addMonths(currentMonth,1))} className="p-2 hover:bg-dark-700 rounded-lg transition-colors">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
             </button>
@@ -237,39 +246,54 @@ export default function Calendar() {
           {loading ? (
             <div className="flex items-center justify-center py-20"><div className="loader"/></div>
           ) : (
-            <div className="p-4">
+            <div className="p-2 sm:p-4">
               <div className="grid grid-cols-7 gap-px bg-dark-700 rounded-lg overflow-hidden">
                 {['السبت','الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة'].map(day=>(
-                  <div key={day} className="bg-dark-800 px-2 py-3 text-center text-sm font-medium text-gray-400">{day}</div>
+                  <div key={day} className="bg-dark-800 px-1.5 sm:px-2 py-2 sm:py-3 text-center text-xs sm:text-sm font-medium text-gray-400">{day}</div>
                 ))}
                 {calendarDays.map(day=>{
                   const items = dayEvents(day)
                   const inMonth = isCurrentMonth(day)
+                  const more = items.length>3?items.length-3:0
                   return (
                     <button
                       key={day.toISOString()}
                       onClick={()=>openDay(day)}
-                      className={`bg-dark-800 p-2 min-h-[88px] text-left transition-all hover:bg-dark-700 relative ${!inMonth?'opacity-40':''} ${isToday(day)?'ring-2 ring-blue-500 bg-blue-950/30':''}`}
+                      className={`relative bg-dark-800 p-2 sm:p-3 min-h-[74px] sm:min-h-[96px] text-left transition-all hover:bg-dark-700 ${!inMonth?'opacity-40':''} ${isToday(day)?'ring-2 ring-blue-500 bg-blue-950/30':''}`}
                     >
                       <div className="text-sm font-medium mb-1">{format(day,'d')}</div>
-                      {items.length>0 && (
-                        <div className="space-y-1">
-                          {items.slice(0,3).map(e=>(
-                            <div
-                              key={e.id}
-                              onClick={ev=>{ev.stopPropagation();openEventDetails(e)}}
-                              className={`text-xs px-1 py-0.5 rounded truncate cursor-pointer hover:opacity-80 ${
-                                e.status==='closed'?'bg-gray-700/50 text-gray-400':
-                                e.status==='postponed'?'bg-yellow-900/30 text-yellow-400':'bg-blue-900/30 text-blue-400'
-                              }`}
-                              title={e.title}
-                            >
-                              {e.title}
+
+                      <div className="hidden md:block">
+                        {items.length>0 && (
+                          <div className="space-y-1">
+                            {items.slice(0,3).map(e=>(
+                              <div
+                                key={e.id}
+                                onClick={ev=>{ev.stopPropagation();openEventDetails(e)}}
+                                className={`text-xs px-1 py-0.5 rounded truncate cursor-pointer hover:opacity-80 ${
+                                  e.status==='closed'?'bg-gray-700/50 text-gray-400':
+                                  e.status==='postponed'?'bg-yellow-900/30 text-yellow-400':'bg-blue-900/30 text-blue-400'
+                                }`}
+                                title={e.title}
+                              >
+                                {e.title}
+                              </div>
+                            ))}
+                            {more>0 && <div className="text-[11px] text-gray-500">+{more} أخرى</div>}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="md:hidden">
+                        {items.length>0 && (
+                          <>
+                            <div className="absolute bottom-2 left-2 text-[11px] px-1.5 py-0.5 rounded bg-dark-700/70 border border-dark-600">
+                              {items.length} قضية
                             </div>
-                          ))}
-                          {items.length>3 && <div className="text-xs text-gray-500">+{items.length-3} آخر</div>}
-                        </div>
-                      )}
+                            {smallDots(items)}
+                          </>
+                        )}
+                      </div>
                     </button>
                   )
                 })}
@@ -281,20 +305,20 @@ export default function Calendar() {
 
       {showDayModal && selectedDate && (
         <div className="modal-backdrop" onClick={()=>{setShowDayModal(false); setSelectedDate(null)}}>
-          <div className="modal-content max-w-4xl" onClick={e=>e.stopPropagation()}>
-            <div className="p-6 border-b border-dark-700 flex items-center justify-between">
-              <h3 className="text-xl font-bold">قضايا يوم {formatDate(selectedDate)}</h3>
+          <div className="modal-content w-full rounded-none sm:rounded-xl h-[92vh] sm:h-auto max-w-full sm:max-w-4xl" onClick={e=>e.stopPropagation()}>
+            <div className="p-4 sm:p-6 border-b border-dark-700 flex items-center justify-between">
+              <h3 className="text-lg sm:text-xl font-bold">قضايا يوم {formatDate(selectedDate)}</h3>
               <button onClick={()=>{setShowDayModal(false); setSelectedDate(null)}} className="p-2 hover:bg-dark-700 rounded-lg">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
 
             <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-dark-700">
-              <div className="flex-1 p-6 max-h-[60vh] overflow-y-auto">
+              <div className="flex-1 p-4 sm:p-6 max-h-[calc(92vh-200px)] sm:max-h-[60vh] overflow-y-auto">
                 <h4 className="font-semibold mb-4 text-gray-300">القضايا المسجلة ({dayEvents(selectedDate).length})</h4>
                 <div className="space-y-3">
                   {dayEvents(selectedDate).length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-10 text-gray-500">
                       <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                       </svg>
@@ -313,7 +337,7 @@ export default function Calendar() {
                             }`}>
                               {ev.status==='closed'?'مغلقة':ev.status==='postponed'?'مؤجلة':'مفتوحة'}
                             </span>
-                            <h5 className="font-semibold text-blue-400">{ev.title}</h5>
+                            <h5 className="font-semibold text-blue-400 truncate">{ev.title}</h5>
                           </div>
                           {ev.court_name && <p className="text-sm text-gray-400 mb-1">المحكمة: {ev.court_name}</p>}
                           {ev.lawyers && ev.lawyers.length>0 && (
@@ -326,10 +350,10 @@ export default function Calendar() {
                             <p className="text-sm text-yellow-400 mt-2">مؤجلة إلى {formatDate(ev.postponed_to)}</p>
                           )}
                         </div>
-                        <div className="flex flex-col gap-2">
-                          <button onClick={()=>openEventDetails(ev)} className="btn-secondary text-sm px-3 py-1">تفاصيل</button>
+                        <div className="flex flex-col gap-2 shrink-0">
+                          <button onClick={()=>openEventDetails(ev)} className="btn-secondary text-sm px-3 py-2">تفاصيل</button>
                           {authStatus.isLoggedIn && ev.status!=='closed' && (
-                            <button onClick={()=>setPostponingEvent(ev)} className="btn-secondary text-sm px-3 py-1">تأجيل</button>
+                            <button onClick={()=>setPostponingEvent(ev)} className="btn-secondary text-sm px-3 py-2">تأجيل</button>
                           )}
                         </div>
                       </div>
@@ -339,7 +363,7 @@ export default function Calendar() {
               </div>
 
               {authStatus.isLoggedIn && (
-                <div className="flex-1 p-6">
+                <div className="flex-1 p-4 sm:p-6">
                   <h4 className="font-semibold mb-4 text-gray-300">إضافة قضية جديدة</h4>
                   <div className="space-y-3">
                     <input value={newEvent.title} onChange={e=>setNewEvent({...newEvent,title:e.target.value})} placeholder="عنوان القضية *" className="w-full p-3 rounded-lg border"/>
@@ -348,7 +372,7 @@ export default function Calendar() {
                     <textarea value={newEvent.description} onChange={e=>setNewEvent({...newEvent,description:e.target.value})} placeholder="وصف مختصر للقضية" rows={3} className="w-full p-3 rounded-lg border"/>
                     <textarea value={newEvent.long_description} onChange={e=>setNewEvent({...newEvent,long_description:e.target.value})} placeholder="تفاصيل إضافية" rows={4} className="w-full p-3 rounded-lg border"/>
                     <button onClick={handleCreateEvent} disabled={!newEvent.title || addingEvent} className="btn-primary w-full disabled:opacity-50">{addingEvent?'جاري الإضافة...':'إضافة القضية'}</button>
-                    <p className="text-xs text-gray-500 text-center">النموذج يبقى مفتوحاً لإضافة قضايا أخرى في نفس اليوم</p>
+                    <p className="text-xs text-gray-500 text-center">يمكنك إضافة أكثر من قضية لهذا اليوم دون إغلاق النافذة</p>
                   </div>
                 </div>
               )}
@@ -359,15 +383,15 @@ export default function Calendar() {
 
       {selectedEvent && (
         <div className="modal-backdrop" onClick={()=>setSelectedEvent(null)}>
-          <div className="modal-content" onClick={e=>e.stopPropagation()}>
-            <div className="p-6 border-b border-dark-700 flex items-center justify-between">
-              <h3 className="text-xl font-bold">تفاصيل القضية</h3>
+          <div className="modal-content w-full rounded-none sm:rounded-xl h-[92vh] sm:h-auto max-w-full sm:max-w-2xl" onClick={e=>e.stopPropagation()}>
+            <div className="p-4 sm:p-6 border-b border-dark-700 flex items-center justify-between">
+              <h3 className="text-lg sm:text-xl font-bold">تفاصيل القضية</h3>
               <button onClick={()=>setSelectedEvent(null)} className="p-2 hover:bg-dark-700 rounded-lg">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
-            <div className="overflow-y-auto max-h-[70vh]">
-              <div className="p-6 space-y-4 border-b border-dark-700">
+            <div className="overflow-y-auto max-h-[calc(92vh-140px)] sm:max-h-[70vh]">
+              <div className="p-4 sm:p-6 space-y-4 border-b border-dark-700">
                 {editMode && authStatus.isLoggedIn ? (
                   <>
                     <input value={editData.title} onChange={e=>setEditData({...editData,title:e.target.value})} className="w-full p-3 rounded-lg border"/>
@@ -436,9 +460,9 @@ export default function Calendar() {
                 )}
               </div>
 
-              <div className="p-6 space-y-4">
+              <div className="p-4 sm:p-6 space-y-4">
                 <h5 className="font-semibold text-gray-300">السجل الزمني</h5>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="space-y-2 max-h-60 sm:max-h-64 overflow-y-auto">
                   {(logs[selectedEvent.case_ref] || []).map(log => (
                     <div key={log.id} className="p-3 bg-dark-700/50 rounded-lg border border-dark-600">
                       <div className="flex items-center gap-2 text-xs mb-1">
@@ -455,14 +479,10 @@ export default function Calendar() {
                         </span>
                         {log.actor && <span className="text-gray-500">بواسطة: {log.actor}</span>}
                       </div>
-
                       {log.message && <p className="text-sm text-gray-300">{log.message}</p>}
-
                       {log.kind==='postpone' && log.from_date && log.to_date && (
                         <p className="text-sm text-yellow-400 mt-1">من {formatDate(log.from_date)} إلى {formatDate(log.to_date)}</p>
                       )}
-
-                      {/* إخفاء تفاصيل التغييرات عند السجل من نوع "create" */}
                       {log.kind !== 'create' && log.changes && typeof log.changes==='object' && Object.keys(log.changes||{}).length>0 && (
                         <div className="mt-2 space-y-1">
                           {Object.entries(log.changes||{}).map(([field, values]: any) => (
@@ -498,11 +518,11 @@ export default function Calendar() {
 
       {postponingEvent && (
         <div className="modal-backdrop" onClick={() => setPostponingEvent(null)}>
-          <div className="modal-content max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-dark-700">
-              <h3 className="text-xl font-bold">تأجيل القضية</h3>
+          <div className="modal-content w-full rounded-none sm:rounded-xl h-[92vh] sm:h-auto max-w-full sm:max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="p-4 sm:p-6 border-b border-dark-700">
+              <h3 className="text-lg sm:text-xl font-bold">تأجيل القضية</h3>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4">
               <p className="text-gray-300">تأجيل: <strong className="text-blue-400">{postponingEvent.title}</strong></p>
               <p className="text-sm text-gray-500">من تاريخ: {formatDate(postponingEvent.date)}</p>
               <div>
@@ -510,7 +530,7 @@ export default function Calendar() {
                 <input type="date" value={postponeDate} onChange={e => setPostponeDate(e.target.value)} min={format(new Date(), 'yyyy-MM-dd')} className="w-full p-3 rounded-lg border"/>
               </div>
             </div>
-            <div className="p-6 border-t border-dark-700 flex gap-3">
+            <div className="p-4 sm:p-6 border-t border-dark-700 flex gap-3">
               <button onClick={handlePostpone} disabled={!postponeDate} className="btn-primary flex-1">تأكيد التأجيل</button>
               <button onClick={() => {setPostponingEvent(null);setPostponeDate('')}} className="btn-secondary">إلغاء</button>
             </div>
