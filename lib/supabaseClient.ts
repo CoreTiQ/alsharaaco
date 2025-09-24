@@ -102,8 +102,8 @@ export const safeUpdate = async (table: string, data: any, filter: any) => {
     }
     
     return { data: result, error: null }
-  } catch (error) {
-    return { data: null, error: error.message }
+  } catch (error: any) {
+    return { data: null, error: error?.message || 'خطأ غير معروف' }
   }
 }
 
@@ -125,8 +125,8 @@ export const safeInsert = async (table: string, data: any) => {
     }
     
     return { data: result, error: null }
-  } catch (error) {
-    return { data: null, error: error.message }
+  } catch (error: any) {
+    return { data: null, error: error?.message || 'خطأ غير معروف' }
   }
 }
 
