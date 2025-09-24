@@ -579,7 +579,7 @@ export default function MobileCalendar() {
                 <div className="mobile-calendar-grid">
                   <div className="mobile-calendar-header">
                     {['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map(day => (
-                      <div key={day} className="mobile-calendar-day-header mobile-calendar-item">{day}</div>
+                      <div key={day} className="mobile-calendar-day-header">{day}</div>
                     ))}
                   </div>
                   {calendarDays.map(day => {
@@ -589,7 +589,7 @@ export default function MobileCalendar() {
                       <button
                         key={day.toISOString()}
                         onClick={() => openDay(day)}
-                        className={`mobile-calendar-day mobile-calendar-item ${!inMonth ? 'other-month' : ''} ${isToday(day) ? 'today' : ''} ${items.length > 0 ? 'has-events' : ''}`}
+                        className={`mobile-calendar-day ${!inMonth ? 'other-month' : ''} ${isToday(day) ? 'today' : ''} ${items.length > 0 ? 'has-events' : ''}`}
                       >
                         <div className="mobile-calendar-day-number">{format(day, 'd')}</div>
                         {items.length > 0 && (
