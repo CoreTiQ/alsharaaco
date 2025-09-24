@@ -16,6 +16,7 @@ export interface Event {
   deleted_at: string | null
 }
 
+
 export interface EventLog {
   id: string
   case_ref: string

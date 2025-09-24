@@ -391,14 +391,11 @@ export default function MobileCalendar() {
         .select()
       if (error) throw error
       setEvents(prev => [...prev, ...(data || [])])
-      
-      // Save to MRU lists for future suggestions
       if (newEvent.court_name.trim()) pushMRU('mru:courts', newEvent.court_name.trim())
       if (newEvent.reviewer.trim()) pushMRU('mru:reviewers', newEvent.reviewer.trim())
       newEvent.lawyers.forEach(lawyer => {
         if (lawyer.trim()) pushMRU('mru:lawyers', lawyer.trim())
       })
-      
       setNewEvent({ title: '', court_name: '', lawyers: [], reviewer: '', description: '', long_description: '' })
       toast.success('تمت إضافة القضية بنجاح')
     } catch {
@@ -428,8 +425,6 @@ export default function MobileCalendar() {
       if (updated) {
         setEvents(prev => prev.map(e => (e.id === selectedEvent.id ? updated : e)))
         setSelectedEvent(updated)
-        
-        // Save to MRU lists for future suggestions
         if (editData.court_name.trim()) pushMRU('mru:courts', editData.court_name.trim())
         if (editData.reviewer.trim()) pushMRU('mru:reviewers', editData.reviewer.trim())
         editData.lawyers.forEach(lawyer => {
@@ -520,33 +515,21 @@ export default function MobileCalendar() {
   }
 
   const getLawyerSuggestions: SuggestFetcher = async q => {
-    // Get from database
     const { data } = await supabase.from('events').select('lawyers').not('lawyers', 'is', null).order('created_at', { ascending: false }).limit(1000)
     const vals: string[] = []
     ;(data || []).forEach(r => {
       const arr = (r as any).lawyers as string[] | null
       if (Array.isArray(arr)) arr.forEach(x => vals.push(x))
     })
-    
-    // Filter by query if provided
     const filtered = q ? vals.filter(v => v.toLowerCase().includes(q.toLowerCase())) : vals
-    
-    // Get frequency count
     const freq = new Map<string, number>()
     filtered.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
-    
-    // Sort by frequency (most used first)
     const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
-    
-    // Get MRU (Most Recently Used) from localStorage
     const mru = readMRU('mru:lawyers')
-    
-    // Merge and deduplicate: MRU first, then database results
     return mergeSuggestions(dbResults, mru)
   }
 
   const getCourtSuggestions: SuggestFetcher = async q => {
-    // Get from database
     const ilike = q ? `%${q}%` : '%'
     const { data } = await supabase
       .from('events')
@@ -556,23 +539,14 @@ export default function MobileCalendar() {
       .order('created_at', { ascending: false })
       .limit(1000)
     const vals = (data || []).map(r => String((r as any).court_name))
-    
-    // Get frequency count
     const freq = new Map<string, number>()
     vals.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
-    
-    // Sort by frequency (most used first)
     const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
-    
-    // Get MRU from localStorage
     const mru = readMRU('mru:courts')
-    
-    // Merge: MRU first, then database results
     return mergeSuggestions(dbResults, mru)
   }
 
   const getReviewerSuggestions: SuggestFetcher = async q => {
-    // Get from database
     const ilike = q ? `%${q}%` : '%'
     const { data } = await supabase
       .from('events')
@@ -582,18 +556,10 @@ export default function MobileCalendar() {
       .order('created_at', { ascending: false })
       .limit(1000)
     const vals = (data || []).map(r => String((r as any).reviewer))
-    
-    // Get frequency count
     const freq = new Map<string, number>()
     vals.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
-    
-    // Sort by frequency (most used first)
     const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
-    
-    // Get MRU from localStorage
     const mru = readMRU('mru:reviewers')
-    
-    // Merge: MRU first, then database results
     return mergeSuggestions(dbResults, mru)
   }
 
@@ -673,7 +639,6 @@ export default function MobileCalendar() {
         </div>
       </main>
 
-      {/* Day Modal */}
       {showDayModal && selectedDate && (
         <div className="mobile-modal-backdrop" onClick={() => { setShowDayModal(false); setSelectedDate(null) }}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
@@ -688,7 +653,6 @@ export default function MobileCalendar() {
 
             <div className="mobile-modal-body">
               <div className="space-y-6">
-                {/* Cases List */}
                 <div>
                   <h4 className="text-lg font-semibold text-gray-200 mb-4">القضايا المسجلة ({dayEvents(selectedDate).length})</h4>
                   <div className="space-y-3">
@@ -734,7 +698,6 @@ export default function MobileCalendar() {
                   </div>
                 </div>
 
-                {/* Add New Case */}
                 {authStatus.isLoggedIn && (
                   <div className="border-t border-dark-600/50 pt-6">
                     <h4 className="text-lg font-semibold text-gray-200 mb-4">إضافة قضية جديدة</h4>
@@ -821,7 +784,6 @@ export default function MobileCalendar() {
         </div>
       )}
 
-      {/* Event Details Modal */}
       {selectedEvent && (
         <div className="mobile-modal-backdrop" onClick={() => setSelectedEvent(null)}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
@@ -961,7 +923,6 @@ export default function MobileCalendar() {
                   </>
                 )}
 
-                {/* Timeline */}
                 <div className="border-t border-dark-600/50 pt-6">
                   <h5 className="font-semibold text-gray-300 mb-4">السجل الزمني</h5>
                   <div className="space-y-3 max-h-48 overflow-y-auto mobile-scroll-smooth">
@@ -1026,7 +987,6 @@ export default function MobileCalendar() {
         </div>
       )}
 
-      {/* Postpone Modal */}
       {postponingEvent && (
         <div className="mobile-modal-backdrop" onClick={() => setPostponingEvent(null)}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
