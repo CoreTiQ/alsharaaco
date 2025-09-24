@@ -422,10 +422,7 @@ export default function MobileCalendar() {
         return
       }
       
-      console.log('Starting update with delete/insert approach')
-      
-      // حفظ البيانات الأصلية
-      const originalEvent = { ...selectedEvent }
+      console.log('Starting controlled update')
       
       // البيانات المحدثة
       const updateData = {
@@ -437,43 +434,19 @@ export default function MobileCalendar() {
         long_description: editData.long_description?.trim() || null
       }
       
-      // حذف القضية الأصلية
-      const { error: deleteError } = await supabase
+      // محاولة التحديث العادي أولاً
+      const { data, error } = await supabase
         .from('events')
-        .delete()
+        .update(updateData)
         .eq('id', selectedEvent.id)
-      
-      if (deleteError) {
-        console.error('Delete error:', deleteError)
-        throw new Error(`خطأ في حذف القضية: ${deleteError.message}`)
-      }
-      
-      // إدراج القضية مع البيانات المحدثة
-      const { data: newEventData, error: insertError } = await supabase
-        .from('events')
-        .insert([{
-          id: originalEvent.id,
-          case_ref: originalEvent.case_ref,
-          date: originalEvent.date,
-          title: updateData.title,
-          court_name: updateData.court_name,
-          lawyers: updateData.lawyers,
-          reviewer: updateData.reviewer,
-          description: updateData.description,
-          long_description: updateData.long_description,
-          status: originalEvent.status,
-          postponed_to: originalEvent.postponed_to,
-          created_at: originalEvent.created_at,
-          deleted_at: null
-        }])
         .select()
       
-      if (insertError) {
-        console.error('Insert error:', insertError)
-        throw new Error(`خطأ في إعادة إدراج القضية: ${insertError.message}`)
+      if (error) {
+        console.error('Update error:', error)
+        throw new Error(`خطأ في التحديث: ${error.message}`)
       }
       
-      const updated = newEventData?.[0]
+      const updated = data?.[0]
       if (updated) {
         setEvents(prev => prev.map(e => (e.id === selectedEvent.id ? updated : e)))
         setSelectedEvent(updated)
@@ -484,6 +457,20 @@ export default function MobileCalendar() {
         updateData.lawyers?.forEach(lawyer => {
           if (lawyer?.trim()) pushMRU('mru:lawyers', lawyer.trim())
         })
+        
+        // إضافة سجل زمني واحد فقط للتحديث
+        const { error: logError } = await supabase
+          .from('event_logs')
+          .insert([{
+            case_ref: selectedEvent.case_ref,
+            kind: 'update',
+            message: `تم تحديث بيانات القضية`,
+            actor: 'admin'
+          }])
+        
+        if (logError) {
+          console.warn('Log error (non-critical):', logError)
+        }
       }
       
       setEditMode(false)
@@ -507,70 +494,60 @@ export default function MobileCalendar() {
       
       const formattedDate = format(validDate, 'yyyy-MM-dd')
       
-      // الحل البديل: حذف وإعادة إدراج بدلاً من التحديث
-      console.log('Starting postpone with delete/insert approach')
+      console.log('Starting postpone with controlled approach')
       
-      // حفظ بيانات القضية الأصلية
-      const originalEvent = { ...postponingEvent }
-      
-      // حذف القضية الأصلية
-      const { error: deleteError } = await supabase
+      // الخطوة الأولى: تحديث القضية الأصلية لتأجيل فقط (بدون حذف/إدراج)
+      const { error: updateError } = await supabase
         .from('events')
-        .delete()
+        .update({ 
+          status: 'postponed', 
+          postponed_to: formattedDate 
+        })
         .eq('id', postponingEvent.id)
       
-      if (deleteError) {
-        console.error('Delete error:', deleteError)
-        throw new Error(`خطأ في حذف القضية القديمة: ${deleteError.message}`)
+      if (updateError) {
+        console.error('Update error:', updateError)
+        throw new Error(`خطأ في تأجيل القضية: ${updateError.message}`)
       }
       
-      // إدراج القضية الأصلية مع الحالة المؤجلة
-      const { error: insertOldError } = await supabase
-        .from('events')
-        .insert([{
-          id: originalEvent.id,
-          case_ref: originalEvent.case_ref,
-          date: originalEvent.date,
-          title: originalEvent.title,
-          court_name: originalEvent.court_name,
-          lawyers: originalEvent.lawyers,
-          reviewer: originalEvent.reviewer,
-          description: originalEvent.description,
-          long_description: originalEvent.long_description,
-          status: 'postponed',
-          postponed_to: formattedDate,
-          created_at: originalEvent.created_at,
-          deleted_at: null
-        }])
-      
-      if (insertOldError) {
-        console.error('Insert old error:', insertOldError)
-        throw new Error(`خطأ في إعادة إدراج القضية المؤجلة: ${insertOldError.message}`)
-      }
-      
-      // إدراج القضية الجديدة بالتاريخ الجديد
+      // الخطوة الثانية: إنشاء قضية جديدة بالتاريخ الجديد فقط
       const newEventData = {
         date: formattedDate,
-        title: originalEvent.title,
-        court_name: originalEvent.court_name,
-        lawyers: originalEvent.lawyers,
-        reviewer: originalEvent.reviewer,
-        description: originalEvent.description,
-        long_description: originalEvent.long_description,
+        title: postponingEvent.title,
+        court_name: postponingEvent.court_name,
+        lawyers: postponingEvent.lawyers,
+        reviewer: postponingEvent.reviewer,
+        description: postponingEvent.description,
+        long_description: postponingEvent.long_description,
         status: 'open',
-        case_ref: originalEvent.case_ref
+        case_ref: postponingEvent.case_ref // نفس الـ case_ref للربط
       }
       
-      const { error: insertNewError } = await supabase
+      const { error: insertError } = await supabase
         .from('events')
         .insert([newEventData])
       
-      if (insertNewError) {
-        console.error('Insert new error:', insertNewError)
-        throw new Error(`خطأ في إنشاء القضية الجديدة: ${insertNewError.message}`)
+      if (insertError) {
+        console.error('Insert error:', insertError)
+        throw new Error(`خطأ في إنشاء القضية الجديدة: ${insertError.message}`)
       }
       
-      // إعادة تحميل الأحداث
+      // الخطوة الثالثة: إضافة سجل زمني واحد فقط للتأجيل
+      const { error: logError } = await supabase
+        .from('event_logs')
+        .insert([{
+          case_ref: postponingEvent.case_ref,
+          kind: 'postpone',
+          message: `تم تأجيل القضية من ${formatDate(postponingEvent.date)} إلى ${formatDate(formattedDate)}`,
+          from_date: postponingEvent.date,
+          to_date: formattedDate,
+          actor: 'admin'
+        }])
+      
+      if (logError) {
+        console.warn('Log error (non-critical):', logError)
+      }
+      
       await fetchEvents()
       setPostponingEvent(null)
       setPostponeDate('')
@@ -838,7 +815,7 @@ export default function MobileCalendar() {
                         </div>
                         <div className="flex gap-2 mt-3 pt-3 border-t border-dark-600/30">
                           <button onClick={() => openEventDetails(ev)} className="mobile-btn mobile-btn-secondary mobile-btn-sm flex-1">تفاصيل</button>
-                          {authStatus.isLoggedIn && ev.status !== 'closed' && (
+                          {authStatus.isLoggedIn && ev.status === 'open' && (
                             <button onClick={() => setPostponingEvent(ev)} className="mobile-btn mobile-btn-secondary mobile-btn-sm">تأجيل</button>
                           )}
                         </div>
@@ -1119,7 +1096,7 @@ export default function MobileCalendar() {
                 </div>
               ) : authStatus.isLoggedIn && (
                 <div className="flex flex-wrap gap-2">
-                  {selectedEvent.status !== 'closed' && (
+                  {selectedEvent.status === 'open' && (
                     <>
                       <button onClick={() => setPostponingEvent(selectedEvent)} className="mobile-btn mobile-btn-secondary flex-1">تأجيل</button>
                       <button onClick={() => handleStatusChange(selectedEvent, 'closed')} className="mobile-btn mobile-btn-secondary flex-1">إغلاق</button>
@@ -1127,6 +1104,11 @@ export default function MobileCalendar() {
                   )}
                   {selectedEvent.status === 'closed' && (
                     <button onClick={() => handleStatusChange(selectedEvent, 'open')} className="mobile-btn mobile-btn-secondary flex-1">إعادة فتح</button>
+                  )}
+                  {selectedEvent.status === 'postponed' && (
+                    <div className="w-full text-center text-sm text-yellow-400 p-2 bg-yellow-500/10 rounded">
+                      هذه القضية مؤجلة إلى {formatDate(selectedEvent.postponed_to || '')}
+                    </div>
                   )}
                   <button onClick={() => handleDelete(selectedEvent)} className="mobile-btn mobile-btn-danger">حذف</button>
                 </div>
