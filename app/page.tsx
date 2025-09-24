@@ -443,7 +443,7 @@ export default function Page() {
 
       if (caseRow.court_name?.trim()) pushMRU('mru:courts', caseRow.court_name.trim())
       if (caseRow.reviewer?.trim()) pushMRU('mru:reviewers', caseRow.reviewer.trim())
-      ;(caseRow.lawyers || []).forEach(l => l?.trim() && pushMRU('mru:lawyers', l.trim()))
+      ;(caseRow.lawyers || []).forEach((l: string) => l?.trim() && pushMRU('mru:lawyers', l.trim()))
 
       setNewCase({ title: '', court_name: '', lawyers: [], reviewer: '', description: '', long_description: '' })
       await loadMonth()
@@ -478,7 +478,7 @@ export default function Page() {
         await loadMonth()
         if (data.court_name?.trim()) pushMRU('mru:courts', data.court_name.trim())
         if (data.reviewer?.trim()) pushMRU('mru:reviewers', data.reviewer.trim())
-        ;(data.lawyers || []).forEach(l => l?.trim() && pushMRU('mru:lawyers', l.trim()))
+        ;(data.lawyers || []).forEach((l: string) => l?.trim() && pushMRU('mru:lawyers', l.trim()))
       }
       setEditMode(false)
       toast.success('تم تحديث بيانات القضية')
