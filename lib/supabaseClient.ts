@@ -84,6 +84,7 @@ export const handleSupabaseError = (error: any) => {
 }
 
 // دالة مساعدة للتحديث الآمن
+// حل بديل للتحديث بدون RLS issues
 export const safeUpdate = async (table: string, data: any, filter: any) => {
   try {
     // إزالة القيم غير المعرفة
@@ -91,14 +92,26 @@ export const safeUpdate = async (table: string, data: any, filter: any) => {
       Object.entries(data).filter(([_, value]) => value !== undefined)
     )
     
-    const { data: result, error } = await supabase
-      .from(table)
-      .update(cleanData)
-      .match(filter)
-      .select()
+    // استخدام rpc بدلاً من update للتجاوز حول مشاكل jsonb_diff
+    const { data: result, error } = await supabase.rpc('safe_update_event', {
+      table_name: table,
+      update_data: cleanData,
+      filter_data: filter
+    })
     
     if (error) {
-      throw new Error(handleSupabaseError(error))
+      // إذا فشل RPC، عد للطريقة القديمة
+      const { data: fallbackResult, error: fallbackError } = await supabase
+        .from(table)
+        .update(cleanData)
+        .match(filter)
+        .select()
+      
+      if (fallbackError) {
+        throw new Error(handleSupabaseError(fallbackError))
+      }
+      
+      return { data: fallbackResult, error: null }
     }
     
     return { data: result, error: null }
