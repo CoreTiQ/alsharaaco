@@ -578,7 +578,7 @@ export default function MobileCalendar() {
               <div className="mobile-calendar-grid-container">
                 <div className="mobile-calendar-grid">
                   <div className="mobile-calendar-header">
-                    {['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map(day => (
+                    {['سبت', 'أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة'].map(day => (
                       <div key={day} className="mobile-calendar-day-header">{day}</div>
                     ))}
                   </div>
@@ -594,7 +594,7 @@ export default function MobileCalendar() {
                         <div className="mobile-calendar-day-number">{format(day, 'd')}</div>
                         {items.length > 0 && (
                           <div className="mobile-calendar-day-events">
-                            {items.length} قضية
+                            {items.length}
                           </div>
                         )}
                       </button>
