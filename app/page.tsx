@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns'
 import { ar } from 'date-fns/locale'
-import { supabase, Event, EventLog } from '@/lib/supabaseClient'
+import { supabase, Event, EventLog, safeUpdate, safeInsert, testConnection } from '@/lib/supabaseClient'
 import { getAuthStatus, logout } from '@/lib/auth'
 import LoginModal from '@/components/LoginModal'
 import toast from 'react-hot-toast'
@@ -316,6 +316,9 @@ export default function MobileCalendar() {
   useEffect(() => {
     fetchEvents()
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js')
+    
+    // اختبار اتصال Supabase
+    testConnection()
   }, [currentMonth])
 
   const fetchEvents = async () => {
@@ -374,25 +377,28 @@ export default function MobileCalendar() {
   const handleCreateEvent = async () => {
     if (!authStatus.isLoggedIn || !newEvent.title || !selectedDate) return
     setAddingEvent(true)
+    
     try {
-      const { data, error } = await supabase
-        .from('events')
-        .insert([
-          {
-            date: formatDateISO(selectedDate),
-            title: newEvent.title,
-            court_name: newEvent.court_name || null,
-            lawyers: newEvent.lawyers.length ? newEvent.lawyers : null,
-            reviewer: newEvent.reviewer || null,
-            description: newEvent.description || null,
-            long_description: newEvent.long_description || null,
-            status: 'open'
-          }
-        ])
-        .select()
-      if (error) throw error
+      const eventData = {
+        date: formatDateISO(selectedDate),
+        title: newEvent.title,
+        court_name: newEvent.court_name || null,
+        lawyers: newEvent.lawyers.length ? newEvent.lawyers : null,
+        reviewer: newEvent.reviewer || null,
+        description: newEvent.description || null,
+        long_description: newEvent.long_description || null,
+        status: 'open'
+      }
+      
+      const { data, error } = await safeInsert('events', eventData)
+      
+      if (error) {
+        throw new Error(error)
+      }
+      
       setEvents(prev => [...prev, ...(data || [])])
       
+      // حفظ في MRU
       if (newEvent.court_name.trim()) pushMRU('mru:courts', newEvent.court_name.trim())
       if (newEvent.reviewer.trim()) pushMRU('mru:reviewers', newEvent.reviewer.trim())
       newEvent.lawyers.forEach(lawyer => {
@@ -401,9 +407,10 @@ export default function MobileCalendar() {
       
       setNewEvent({ title: '', court_name: '', lawyers: [], reviewer: '', description: '', long_description: '' })
       toast.success('تمت إضافة القضية بنجاح')
+      
     } catch (error: any) {
       console.error('Create event error:', error)
-      toast.error('فشلت الإضافة')
+      toast.error(error.message || 'فشلت الإضافة')
     } finally {
       setAddingEvent(false)
     }
@@ -413,57 +420,38 @@ export default function MobileCalendar() {
     if (!selectedEvent || !authStatus.isLoggedIn) return
     
     try {
-      console.log('Updating event:', selectedEvent.id)
-      console.log('Update data:', editData)
+      if (!editData.title?.trim()) {
+        toast.error('عنوان القضية مطلوب')
+        return
+      }
       
-      // التأكد من صحة البيانات
+      // استخدام الدالة الآمنة للتحديث
       const updateData = {
-        title: editData.title?.trim() || '',
+        title: editData.title.trim(),
         court_name: editData.court_name?.trim() || null,
-        lawyers: editData.lawyers && editData.lawyers.length > 0 ? editData.lawyers : null,
+        lawyers: editData.lawyers?.length ? editData.lawyers : null,
         reviewer: editData.reviewer?.trim() || null,
         description: editData.description?.trim() || null,
         long_description: editData.long_description?.trim() || null
       }
       
-      // التأكد من وجود العنوان
-      if (!updateData.title) {
-        toast.error('عنوان القضية مطلوب')
-        return
-      }
-      
-      console.log('Sanitized update data:', updateData)
-      
-      const { data, error } = await supabase
-        .from('events')
-        .update(updateData)
-        .eq('id', selectedEvent.id)
-        .select()
+      const { data, error } = await safeUpdate('events', updateData, { id: selectedEvent.id })
       
       if (error) {
-        console.error('Update error details:', error)
-        throw new Error(`خطأ في التحديث: ${error.message}`)
+        throw new Error(error)
       }
-      
-      console.log('Update successful:', data)
       
       const updated = data?.[0]
       if (updated) {
         setEvents(prev => prev.map(e => (e.id === selectedEvent.id ? updated : e)))
         setSelectedEvent(updated)
         
-        // حفظ في MRU lists
-        if (updateData.court_name) {
-          pushMRU('mru:courts', updateData.court_name)
-        }
-        if (updateData.reviewer) {
-          pushMRU('mru:reviewers', updateData.reviewer)
-        }
-        if (updateData.lawyers) {
-          updateData.lawyers.forEach((lawyer: string) => {
-            if (lawyer.trim()) pushMRU('mru:lawyers', lawyer.trim())
-          })
-        }
+        // حفظ في MRU
+        if (updateData.court_name) pushMRU('mru:courts', updateData.court_name)
+        if (updateData.reviewer) pushMRU('mru:reviewers', updateData.reviewer)
+        updateData.lawyers?.forEach(lawyer => {
+          if (lawyer?.trim()) pushMRU('mru:lawyers', lawyer.trim())
+        })
       }
       
       setEditMode(false)
@@ -492,17 +480,13 @@ export default function MobileCalendar() {
       console.log('Formatted date:', formattedDate)
       
       // الخطوة الأولى: تحديث القضية الحالية
-      const { error: updateError } = await supabase
-        .from('events')
-        .update({ 
-          status: 'postponed', 
-          postponed_to: formattedDate 
-        })
-        .eq('id', postponingEvent.id)
+      const { error: updateError } = await safeUpdate('events', { 
+        status: 'postponed', 
+        postponed_to: formattedDate 
+      }, { id: postponingEvent.id })
       
       if (updateError) {
-        console.error('Update error details:', updateError)
-        throw new Error(`خطأ في تحديث القضية: ${updateError.message}`)
+        throw new Error(`خطأ في تحديث القضية: ${updateError}`)
       }
       
       // الخطوة الثانية: إنشاء قضية جديدة بالتاريخ الجديد
@@ -518,15 +502,10 @@ export default function MobileCalendar() {
         case_ref: postponingEvent.case_ref
       }
       
-      console.log('New event data:', newEventData)
-      
-      const { error: insertError } = await supabase
-        .from('events')
-        .insert([newEventData])
+      const { error: insertError } = await safeInsert('events', newEventData)
       
       if (insertError) {
-        console.error('Insert error details:', insertError)
-        throw new Error(`خطأ في إنشاء القضية الجديدة: ${insertError.message}`)
+        throw new Error(`خطأ في إنشاء القضية الجديدة: ${insertError}`)
       }
       
       // إعادة تحميل الأحداث
@@ -547,8 +526,12 @@ export default function MobileCalendar() {
   const handleStatusChange = async (event: Event, newStatus: 'open' | 'closed') => {
     if (!authStatus.isLoggedIn) return
     try {
-      const { data, error } = await supabase.from('events').update({ status: newStatus }).eq('id', event.id).select()
-      if (error) throw error
+      const { data, error } = await safeUpdate('events', { status: newStatus }, { id: event.id })
+      
+      if (error) {
+        throw new Error(error)
+      }
+      
       const updated = data?.[0]
       if (updated) {
         setEvents(prev => prev.map(e => (e.id === event.id ? updated : e)))
@@ -557,39 +540,52 @@ export default function MobileCalendar() {
       toast.success(newStatus === 'closed' ? 'تم إغلاق القضية' : 'تم إعادة فتح القضية')
     } catch (error: any) {
       console.error('Status change error:', error)
-      toast.error('فشل التحديث')
+      toast.error(error.message || 'فشل التحديث')
     }
   }
 
   const handleDelete = async (event: Event) => {
     if (!authStatus.isLoggedIn || !confirm('هل تريد حذف هذه القضية؟')) return
     try {
-      const { error } = await supabase.from('events').update({ status: 'deleted', deleted_at: new Date().toISOString() }).eq('id', event.id)
-      if (error) throw error
+      const { error } = await safeUpdate('events', { 
+        status: 'deleted', 
+        deleted_at: new Date().toISOString() 
+      }, { id: event.id })
+      
+      if (error) {
+        throw new Error(error)
+      }
+      
       setEvents(prev => prev.filter(e => e.id !== event.id))
       if (selectedEvent?.id === event.id) setSelectedEvent(null)
       toast.success('تم الحذف')
     } catch (error: any) {
       console.error('Delete error:', error)
-      toast.error('فشل الحذف')
+      toast.error(error.message || 'فشل الحذف')
     }
   }
 
   const handleAddNote = async () => {
     if (!selectedEvent || !noteText.trim() || !authStatus.isLoggedIn) return
     try {
-      const { data, error } = await supabase
-        .from('event_logs')
-        .insert([{ case_ref: selectedEvent.case_ref, kind: 'note', message: noteText.trim(), actor: 'admin' }])
-        .select()
-      if (error) throw error
+      const { data, error } = await safeInsert('event_logs', { 
+        case_ref: selectedEvent.case_ref, 
+        kind: 'note', 
+        message: noteText.trim(), 
+        actor: 'admin' 
+      })
+      
+      if (error) {
+        throw new Error(error)
+      }
+      
       const added = data?.[0]
       if (added) setLogs(prev => ({ ...prev, [selectedEvent.case_ref]: [...(prev[selectedEvent.case_ref] || []), added] }))
       setNoteText('')
       toast.success('تمت إضافة الملاحظة')
     } catch (error: any) {
       console.error('Add note error:', error)
-      toast.error('فشل إضافة الملاحظة')
+      toast.error(error.message || 'فشل إضافة الملاحظة')
     }
   }
 
@@ -736,7 +732,6 @@ export default function MobileCalendar() {
 
       {/* Day Modal */}
       {showDayModal && selectedDate && (
-        <div className="mobile-modal-backdrop" onClick={() => { setShowDayModal(false); setSelectedDate(null) }}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
             <div className="mobile-modal-header">
               <h3 className="mobile-modal-title">قضايا يوم {formatDate(selectedDate)}</h3>
