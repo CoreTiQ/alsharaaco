@@ -316,8 +316,6 @@ export default function MobileCalendar() {
   useEffect(() => {
     fetchEvents()
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js')
-    
-    // اختبار اتصال Supabase
     testConnection()
   }, [currentMonth])
 
@@ -398,7 +396,6 @@ export default function MobileCalendar() {
       
       setEvents(prev => [...prev, ...(data || [])])
       
-      // حفظ في MRU
       if (newEvent.court_name.trim()) pushMRU('mru:courts', newEvent.court_name.trim())
       if (newEvent.reviewer.trim()) pushMRU('mru:reviewers', newEvent.reviewer.trim())
       newEvent.lawyers.forEach(lawyer => {
@@ -425,7 +422,6 @@ export default function MobileCalendar() {
         return
       }
       
-      // استخدام الدالة الآمنة للتحديث
       const updateData = {
         title: editData.title.trim(),
         court_name: editData.court_name?.trim() || null,
@@ -446,7 +442,6 @@ export default function MobileCalendar() {
         setEvents(prev => prev.map(e => (e.id === selectedEvent.id ? updated : e)))
         setSelectedEvent(updated)
         
-        // حفظ في MRU
         if (updateData.court_name) pushMRU('mru:courts', updateData.court_name)
         if (updateData.reviewer) pushMRU('mru:reviewers', updateData.reviewer)
         updateData.lawyers?.forEach(lawyer => {
@@ -467,9 +462,6 @@ export default function MobileCalendar() {
     if (!postponingEvent || !postponeDate || !authStatus.isLoggedIn) return
     
     try {
-      console.log('Original postponeDate:', postponeDate)
-      
-      // تأكد من صيغة التاريخ
       const validDate = new Date(postponeDate)
       if (isNaN(validDate.getTime())) {
         toast.error('صيغة التاريخ غير صحيحة')
@@ -477,9 +469,7 @@ export default function MobileCalendar() {
       }
       
       const formattedDate = format(validDate, 'yyyy-MM-dd')
-      console.log('Formatted date:', formattedDate)
       
-      // الخطوة الأولى: تحديث القضية الحالية
       const { error: updateError } = await safeUpdate('events', { 
         status: 'postponed', 
         postponed_to: formattedDate 
@@ -489,7 +479,6 @@ export default function MobileCalendar() {
         throw new Error(`خطأ في تحديث القضية: ${updateError}`)
       }
       
-      // الخطوة الثانية: إنشاء قضية جديدة بالتاريخ الجديد
       const newEventData = {
         date: formattedDate,
         title: postponingEvent.title,
@@ -508,13 +497,9 @@ export default function MobileCalendar() {
         throw new Error(`خطأ في إنشاء القضية الجديدة: ${insertError}`)
       }
       
-      // إعادة تحميل الأحداث
       await fetchEvents()
-      
-      // إغلاق النموذج وإعادة تعيين القيم
       setPostponingEvent(null)
       setPostponeDate('')
-      
       toast.success('تم التأجيل بنجاح')
       
     } catch (error: any) {
@@ -730,8 +715,8 @@ export default function MobileCalendar() {
         </div>
       </main>
 
-      {/* Day Modal */}
       {showDayModal && selectedDate && (
+        <div className="mobile-modal-backdrop" onClick={() => { setShowDayModal(false); setSelectedDate(null) }}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
             <div className="mobile-modal-header">
               <h3 className="mobile-modal-title">قضايا يوم {formatDate(selectedDate)}</h3>
@@ -741,7 +726,6 @@ export default function MobileCalendar() {
                 </svg>
               </button>
             </div>
-
             <div className="mobile-modal-body">
               <div className="space-y-6">
                 <div>
@@ -875,7 +859,6 @@ export default function MobileCalendar() {
         </div>
       )}
 
-      {/* Event Details Modal */}
       {selectedEvent && (
         <div className="mobile-modal-backdrop" onClick={() => setSelectedEvent(null)}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
@@ -1079,7 +1062,6 @@ export default function MobileCalendar() {
         </div>
       )}
 
-      {/* Postpone Modal */}
       {postponingEvent && (
         <div className="mobile-modal-backdrop" onClick={() => setPostponingEvent(null)}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
@@ -1135,4 +1117,3 @@ export default function MobileCalendar() {
       />
     </div>
   )
-}
