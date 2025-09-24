@@ -71,7 +71,7 @@ function mergeSuggestions(primary: string[], mru: string[]) {
   return out
 }
 
-function AutocompleteInput(props: {
+function MobileAutocompleteInput(props: {
   value: string
   onChange: (v: string) => void
   placeholder?: string
@@ -94,7 +94,7 @@ function AutocompleteInput(props: {
     const run = async () => {
       const q = debounced.trim()
       const base = await fetcher(q)
-      const merged = mergeSuggestions(base, mru).slice(0, 12)
+      const merged = mergeSuggestions(base, mru).slice(0, 8)
       if (!ignore) setItems(merged)
     }
     run()
@@ -113,7 +113,7 @@ function AutocompleteInput(props: {
   }, [])
 
   return (
-    <div ref={boxRef} className="relative">
+    <div ref={boxRef} className="mobile-autocomplete">
       <input
         value={query}
         onChange={e => {
@@ -123,10 +123,10 @@ function AutocompleteInput(props: {
         }}
         onFocus={() => setOpen(true)}
         placeholder={placeholder}
-        className="w-full p-3 rounded-lg border bg-dark-800 border-dark-600 text-gray-100 placeholder-gray-500"
+        className="mobile-field"
       />
       {open && items.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full max-h-56 overflow-auto rounded-lg border border-dark-600 bg-dark-800 shadow-xl">
+        <div className="mobile-autocomplete-dropdown">
           {items.map(s => (
             <button
               key={s}
@@ -138,7 +138,7 @@ function AutocompleteInput(props: {
                 pushMRU(mruKey, s)
                 onSelect && onSelect(s)
               }}
-              className="w-full text-right px-3 py-2 hover:bg-dark-700 text-sm truncate"
+              className="mobile-autocomplete-item"
             >
               {s}
             </button>
@@ -149,7 +149,7 @@ function AutocompleteInput(props: {
   )
 }
 
-function TokenInput(props: {
+function MobileTokenInput(props: {
   tokens: string[]
   onTokensChange: (t: string[]) => void
   placeholder?: string
@@ -168,7 +168,7 @@ function TokenInput(props: {
     let ignore = false
     const run = async () => {
       const base = await fetcher(debounced.trim())
-      const merged = mergeSuggestions(base, mru).filter(s => !tokens.includes(s)).slice(0, 12)
+      const merged = mergeSuggestions(base, mru).filter(s => !tokens.includes(s)).slice(0, 8)
       if (!ignore) setItems(merged)
     }
     run()
@@ -201,19 +201,19 @@ function TokenInput(props: {
   }
 
   return (
-    <div ref={boxRef} className="relative">
-      <div className="flex flex-wrap gap-2 p-2 rounded-lg border bg-dark-800 border-dark-600">
+    <div ref={boxRef} className="mobile-autocomplete">
+      <div className="mobile-token-input">
         {tokens.map((t, i) => (
-          <span key={`${t}-${i}`} className="px-2 py-1 rounded-full text-xs bg-dark-700">
+          <div key={`${t}-${i}`} className="mobile-token">
             {t}
             <button
               type="button"
               onClick={() => onTokensChange(tokens.filter(x => x !== t))}
-              className="ml-1 text-gray-400 hover:text-gray-200"
+              className="mobile-token-remove"
             >
               ×
             </button>
-          </span>
+          </div>
         ))}
         <input
           value={input}
@@ -231,17 +231,17 @@ function TokenInput(props: {
             }
           }}
           placeholder={placeholder}
-          className="flex-1 min-w-[120px] bg-transparent outline-none placeholder-gray-500"
+          className="mobile-token-input-field"
         />
       </div>
       {open && items.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full max-h-56 overflow-auto rounded-lg border border-dark-600 bg-dark-800 shadow-xl">
+        <div className="mobile-autocomplete-dropdown">
           {items.map(s => (
             <button
               key={s}
               type="button"
               onClick={() => addToken(s)}
-              className="w-full text-right px-3 py-2 hover:bg-dark-700 text-sm truncate"
+              className="mobile-autocomplete-item"
             >
               {s}
             </button>
@@ -252,7 +252,7 @@ function TokenInput(props: {
   )
 }
 
-export default function Calendar() {
+export default function MobileCalendar() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [events, setEvents] = useState<Event[]>([])
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -538,43 +538,49 @@ export default function Calendar() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-dark-950 to-dark-900">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-        <header className="mb-4 sm:mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">شركة الشرع للمحاماة</h1>
-            <div className="flex items-center gap-2 sm:gap-3">
-              {authStatus.isLoggedIn ? (
-                <>
-                  <span className="status-badge bg-green-900/30 text-green-400 border border-green-600">مدير النظام</span>
-                  <button onClick={handleLogout} className="btn-danger">خروج</button>
-                </>
-              ) : (
-                <button onClick={() => setShowLoginModal(true)} className="btn-primary">مدخل البيانات</button>
-              )}
-            </div>
-          </div>
-        </header>
+    <div className="mobile-app mobile-safe-top mobile-safe-bottom">
+      <header className="mobile-header mobile-safe-left mobile-safe-right">
+        <div className="mobile-header-title">شركة الشرع للمحاماة</div>
+        <div className="header-actions">
+          {authStatus.isLoggedIn ? (
+            <>
+              <span className="mobile-status-badge mobile-status-success">مدير النظام</span>
+              <button onClick={handleLogout} className="mobile-btn mobile-btn-danger mobile-btn-sm">خروج</button>
+            </>
+          ) : (
+            <button onClick={() => setShowLoginModal(true)} className="mobile-btn mobile-btn-primary mobile-btn-sm">مدخل البيانات</button>
+          )}
+        </div>
+      </header>
 
-        <div className="bg-dark-800/50 backdrop-blur rounded-2xl shadow-xl border border-dark-700 overflow-hidden">
-          <div className="bg-dark-900/50 px-3 sm:px-6 py-3 sm:py-4 border-b border-dark-700 flex items-center justify-between">
-            <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-dark-700 rounded-lg transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+      <main className="mobile-main mobile-safe-left mobile-safe-right mobile-scroll-smooth">
+        <div className="mobile-calendar">
+          <div className="mobile-calendar-nav">
+            <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="mobile-calendar-nav-btn">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+              </svg>
             </button>
-            <h2 className="text-lg sm:text-xl font-bold">{format(currentMonth, 'MMMM yyyy', { locale: ar })}</h2>
-            <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-dark-700 rounded-lg transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            <h2 className="mobile-calendar-title">{format(currentMonth, 'MMMM yyyy', { locale: ar })}</h2>
+            <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="mobile-calendar-nav-btn">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+              </svg>
             </button>
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-20"><div className="loader" /></div>
+            <div className="flex items-center justify-center py-20">
+              <div className="mobile-loader" />
+            </div>
           ) : (
-            <div className="p-2 sm:p-4">
-              <div className="grid grid-cols-7 gap-px bg-dark-700 rounded-lg overflow-hidden">
-                {['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map(day => (
-                  <div key={day} className="bg-dark-800 px-1 sm:px-2 py-2 sm:py-3 text-center text-xs sm:text-sm font-medium text-gray-400">{day}</div>
-                ))}
+            <div className="mobile-calendar-content">
+              <div className="mobile-calendar-grid">
+                <div className="mobile-calendar-header">
+                  {['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map(day => (
+                    <div key={day} className="mobile-calendar-day-header">{day}</div>
+                  ))}
+                </div>
                 {calendarDays.map(day => {
                   const items = dayEvents(day)
                   const inMonth = isCurrentMonth(day)
@@ -582,14 +588,12 @@ export default function Calendar() {
                     <button
                       key={day.toISOString()}
                       onClick={() => openDay(day)}
-                      className={`bg-dark-800 p-2 sm:p-3 min-h-[88px] text-left transition-all hover:bg-dark-700 relative ${!inMonth ? 'opacity-40' : ''} ${isToday(day) ? 'ring-2 ring-blue-500 bg-blue-950/30' : ''}`}
+                      className={`mobile-calendar-day ${!inMonth ? 'other-month' : ''} ${isToday(day) ? 'today' : ''} ${items.length > 0 ? 'has-events' : ''}`}
                     >
-                      <div className="text-sm font-medium mb-1">{format(day, 'd')}</div>
+                      <div className="mobile-calendar-day-number">{format(day, 'd')}</div>
                       {items.length > 0 && (
-                        <div className="space-y-1">
-                          <div className="text-[11px] sm:text-xs px-1 py-0.5 rounded bg-blue-900/30 text-blue-300 inline-flex items-center gap-1">
-                            {items.length} قضية
-                          </div>
+                        <div className="mobile-calendar-day-events">
+                          {items.length} قضية
                         </div>
                       )}
                     </button>
@@ -599,91 +603,350 @@ export default function Calendar() {
             </div>
           )}
         </div>
-      </div>
+      </main>
 
+      {/* Day Modal */}
       {showDayModal && selectedDate && (
-        <div className="modal-backdrop" onClick={() => { setShowDayModal(false); setSelectedDate(null) }}>
-          <div className="modal-content max-w-5xl" onClick={e => e.stopPropagation()}>
-            <div className="p-4 sm:p-6 border-b border-dark-700 flex items-center justify-between">
-              <h3 className="text-lg sm:text-xl font-bold">قضايا يوم {formatDate(selectedDate)}</h3>
-              <button onClick={() => { setShowDayModal(false); setSelectedDate(null) }} className="p-2 hover:bg-dark-700 rounded-lg">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+        <div className="mobile-modal-backdrop" onClick={() => { setShowDayModal(false); setSelectedDate(null) }}>
+          <div className="mobile-modal" onClick={e => e.stopPropagation()}>
+            <div className="mobile-modal-header">
+              <h3 className="mobile-modal-title">قضايا يوم {formatDate(selectedDate)}</h3>
+              <button onClick={() => { setShowDayModal(false); setSelectedDate(null) }} className="mobile-modal-close">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
 
-            <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-dark-700">
-              <div className="flex-1 p-4 sm:p-6 max-h-[65vh] overflow-y-auto">
-                <h4 className="font-semibold mb-4 text-gray-300">القضايا المسجلة ({dayEvents(selectedDate).length})</h4>
-                <div className="space-y-3">
-                  {dayEvents(selectedDate).length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      <p>لا توجد قضايا في هذا اليوم</p>
-                    </div>
-                  )}
-                  {dayEvents(selectedDate).map(ev => (
-                    <div key={ev.id} className="p-3 sm:p-4 bg-dark-700/40 rounded-lg border border-dark-600 hover:bg-dark-700/60 transition-colors">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className={`status-badge ${ev.status === 'closed' ? 'bg-gray-900/30 text-gray-400 border-gray-600' : ev.status === 'postponed' ? 'bg-yellow-900/30 text-yellow-400 border-yellow-600' : 'bg-green-900/30 text-green-400 border-green-600'}`}>
-                              {ev.status === 'closed' ? 'مغلقة' : ev.status === 'postponed' ? 'مؤجلة' : 'مفتوحة'}
-                            </span>
-                            <h5 className="font-semibold text-blue-400 truncate">{ev.title}</h5>
-                          </div>
-                          {ev.court_name && <p className="text-sm text-gray-400 mb-1">المحكمة: {ev.court_name}</p>}
-                          {ev.reviewer && <p className="text-sm text-gray-400 mb-1">المراجع: {ev.reviewer}</p>}
-                          {ev.lawyers && ev.lawyers.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-2">
-                              {ev.lawyers.map((l, i) => (<span key={i} className="px-2 py-0.5 bg-dark-800 rounded-full text-xs">{l}</span>))}
+            <div className="mobile-modal-body">
+              <div className="space-y-6">
+                {/* Cases List */}
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-200 mb-4">القضايا المسجلة ({dayEvents(selectedDate).length})</h4>
+                  <div className="space-y-3">
+                    {dayEvents(selectedDate).length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p className="text-lg">لا توجد قضايا في هذا اليوم</p>
+                      </div>
+                    )}
+                    {dayEvents(selectedDate).map(ev => (
+                      <div key={ev.id} className="p-4 bg-dark-700/60 rounded-xl border border-dark-600/50 backdrop-blur-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className={`mobile-status-badge ${ev.status === 'closed' ? 'mobile-status-neutral' : ev.status === 'postponed' ? 'mobile-status-warning' : 'mobile-status-success'}`}>
+                                {ev.status === 'closed' ? 'مغلقة' : ev.status === 'postponed' ? 'مؤجلة' : 'مفتوحة'}
+                              </span>
                             </div>
-                          )}
-                          {ev.description && <p className="text-sm text-gray-300 line-clamp-2">{ev.description}</p>}
-                          {ev.status === 'postponed' && ev.postponed_to && <p className="text-sm text-yellow-400 mt-2">مؤجلة إلى {formatDate(ev.postponed_to)}</p>}
+                            <h5 className="font-semibold text-blue-400 mb-2 text-lg">{ev.title}</h5>
+                            {ev.court_name && <p className="text-sm text-gray-400 mb-1">المحكمة: {ev.court_name}</p>}
+                            {ev.reviewer && <p className="text-sm text-gray-400 mb-1">المراجع: {ev.reviewer}</p>}
+                            {ev.lawyers && ev.lawyers.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-2">
+                                {ev.lawyers.map((l, i) => (
+                                  <span key={i} className="px-2 py-1 bg-dark-800/60 rounded-full text-xs border border-dark-600/50">{l}</span>
+                                ))}
+                              </div>
+                            )}
+                            {ev.description && <p className="text-sm text-gray-300 mt-2">{ev.description}</p>}
+                            {ev.status === 'postponed' && ev.postponed_to && <p className="text-sm text-yellow-400 mt-2">مؤجلة إلى {formatDate(ev.postponed_to)}</p>}
+                          </div>
                         </div>
-                        <div className="flex flex-col gap-2">
-                          <button onClick={() => openEventDetails(ev)} className="btn-secondary text-sm px-3 py-1">تفاصيل</button>
-                          {authStatus.isLoggedIn && ev.status !== 'closed' && <button onClick={() => setPostponingEvent(ev)} className="btn-secondary text-sm px-3 py-1">تأجيل</button>}
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-dark-600/30">
+                          <button onClick={() => openEventDetails(ev)} className="mobile-btn mobile-btn-secondary mobile-btn-sm flex-1">تفاصيل</button>
+                          {authStatus.isLoggedIn && ev.status !== 'closed' && (
+                            <button onClick={() => setPostponingEvent(ev)} className="mobile-btn mobile-btn-secondary mobile-btn-sm">تأجيل</button>
+                          )}
                         </div>
                       </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Add New Case */}
+                {authStatus.isLoggedIn && (
+                  <div className="border-t border-dark-600/50 pt-6">
+                    <h4 className="text-lg font-semibold text-gray-200 mb-4">إضافة قضية جديدة</h4>
+                    <div className="space-y-4">
+                      <div className="mobile-field-group">
+                        <label className="mobile-field-label">عنوان القضية *</label>
+                        <input 
+                          value={newEvent.title} 
+                          onChange={e => setNewEvent({ ...newEvent, title: e.target.value })} 
+                          placeholder="أدخل عنوان القضية" 
+                          className="mobile-field" 
+                        />
+                      </div>
+                      <div className="mobile-field-group">
+                        <label className="mobile-field-label">اسم المحكمة</label>
+                        <MobileAutocompleteInput
+                          value={newEvent.court_name}
+                          onChange={v => setNewEvent({ ...newEvent, court_name: v })}
+                          placeholder="اختر أو أدخل اسم المحكمة"
+                          fetcher={getCourtSuggestions}
+                          mruKey="mru:courts"
+                        />
+                      </div>
+                      <div className="mobile-field-group">
+                        <label className="mobile-field-label">أسماء المحامين</label>
+                        <MobileTokenInput
+                          tokens={newEvent.lawyers}
+                          onTokensChange={t => setNewEvent({ ...newEvent, lawyers: t })}
+                          placeholder="أضف أسماء المحامين"
+                          fetcher={getLawyerSuggestions}
+                          mruKey="mru:lawyers"
+                        />
+                      </div>
+                      <div className="mobile-field-group">
+                        <label className="mobile-field-label">اسم المراجع</label>
+                        <MobileAutocompleteInput
+                          value={newEvent.reviewer}
+                          onChange={v => setNewEvent({ ...newEvent, reviewer: v })}
+                          placeholder="اختر أو أدخل اسم المراجع"
+                          fetcher={getReviewerSuggestions}
+                          mruKey="mru:reviewers"
+                        />
+                      </div>
+                      <div className="mobile-field-group">
+                        <label className="mobile-field-label">وصف مختصر</label>
+                        <textarea 
+                          value={newEvent.description} 
+                          onChange={e => setNewEvent({ ...newEvent, description: e.target.value })} 
+                          placeholder="وصف مختصر للقضية" 
+                          rows={3} 
+                          className="mobile-field" 
+                        />
+                      </div>
+                      <div className="mobile-field-group">
+                        <label className="mobile-field-label">تفاصيل إضافية</label>
+                        <textarea 
+                          value={newEvent.long_description} 
+                          onChange={e => setNewEvent({ ...newEvent, long_description: e.target.value })} 
+                          placeholder="تفاصيل إضافية أو ملاحظات" 
+                          rows={4} 
+                          className="mobile-field" 
+                        />
+                      </div>
                     </div>
-                  ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {authStatus.isLoggedIn && (
+              <div className="mobile-modal-footer">
+                <button 
+                  onClick={handleCreateEvent} 
+                  disabled={!newEvent.title || addingEvent} 
+                  className="mobile-btn mobile-btn-primary mobile-btn-lg w-full disabled:opacity-50"
+                >
+                  {addingEvent ? 'جاري الإضافة...' : 'إضافة القضية'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Event Details Modal */}
+      {selectedEvent && (
+        <div className="mobile-modal-backdrop" onClick={() => setSelectedEvent(null)}>
+          <div className="mobile-modal" onClick={e => e.stopPropagation()}>
+            <div className="mobile-modal-header">
+              <h3 className="mobile-modal-title">تفاصيل القضية</h3>
+              <button onClick={() => setSelectedEvent(null)} className="mobile-modal-close">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="mobile-modal-body">
+              <div className="space-y-6">
+                {editMode && authStatus.isLoggedIn ? (
+                  <>
+                    <div className="mobile-field-group">
+                      <label className="mobile-field-label">عنوان القضية</label>
+                      <input 
+                        value={editData.title} 
+                        onChange={e => setEditData({ ...editData, title: e.target.value })} 
+                        className="mobile-field" 
+                      />
+                    </div>
+                    <div className="mobile-field-group">
+                      <label className="mobile-field-label">المحكمة</label>
+                      <MobileAutocompleteInput
+                        value={editData.court_name}
+                        onChange={v => setEditData({ ...editData, court_name: v })}
+                        placeholder="اسم المحكمة"
+                        fetcher={getCourtSuggestions}
+                        mruKey="mru:courts"
+                      />
+                    </div>
+                    <div className="mobile-field-group">
+                      <label className="mobile-field-label">المحامون</label>
+                      <MobileTokenInput
+                        tokens={editData.lawyers}
+                        onTokensChange={t => setEditData({ ...editData, lawyers: t })}
+                        placeholder="أسماء المحامين"
+                        fetcher={getLawyerSuggestions}
+                        mruKey="mru:lawyers"
+                      />
+                    </div>
+                    <div className="mobile-field-group">
+                      <label className="mobile-field-label">المراجع</label>
+                      <MobileAutocompleteInput
+                        value={editData.reviewer}
+                        onChange={v => setEditData({ ...editData, reviewer: v })}
+                        placeholder="اسم المراجع"
+                        fetcher={getReviewerSuggestions}
+                        mruKey="mru:reviewers"
+                      />
+                    </div>
+                    <div className="mobile-field-group">
+                      <label className="mobile-field-label">الوصف</label>
+                      <textarea 
+                        value={editData.description} 
+                        onChange={e => setEditData({ ...editData, description: e.target.value })} 
+                        rows={2} 
+                        className="mobile-field" 
+                      />
+                    </div>
+                    <div className="mobile-field-group">
+                      <label className="mobile-field-label">التفاصيل</label>
+                      <textarea 
+                        value={editData.long_description} 
+                        onChange={e => setEditData({ ...editData, long_description: e.target.value })} 
+                        rows={3} 
+                        className="mobile-field" 
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="text-xl font-bold text-blue-400 mb-3">{selectedEvent.title}</h4>
+                        <div className="inline-flex items-center gap-2 mb-4">
+                          <span className={`mobile-status-badge ${selectedEvent.status === 'closed' ? 'mobile-status-neutral' : selectedEvent.status === 'postponed' ? 'mobile-status-warning' : 'mobile-status-success'}`}>
+                            {selectedEvent.status === 'closed' ? 'مغلقة' : selectedEvent.status === 'postponed' ? 'مؤجلة' : 'مفتوحة'}
+                          </span>
+                          {selectedEvent.status === 'postponed' && selectedEvent.postponed_to && (
+                            <span className="text-sm text-yellow-400">إلى {formatDate(selectedEvent.postponed_to)}</span>
+                          )}
+                        </div>
+                      </div>
+                      {authStatus.isLoggedIn && (
+                        <button onClick={() => setEditMode(true)} className="mobile-btn-icon mobile-btn-secondary">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500 min-w-[80px]">التاريخ:</span>
+                        <span>{formatDate(selectedEvent.date)}</span>
+                      </div>
+                      {!!selectedEvent.court_name && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500 min-w-[80px]">المحكمة:</span>
+                          <span>{selectedEvent.court_name}</span>
+                        </div>
+                      )}
+                      {!!selectedEvent.reviewer && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500 min-w-[80px]">المراجع:</span>
+                          <span>{selectedEvent.reviewer}</span>
+                        </div>
+                      )}
+                      {selectedEvent.lawyers && selectedEvent.lawyers.length > 0 && (
+                        <div>
+                          <span className="text-gray-500">المحامون:</span>
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {selectedEvent.lawyers.map((l, i) => (
+                              <span key={i} className="px-2 py-1 bg-dark-700/60 rounded-full text-xs border border-dark-600/50">{l}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {!!selectedEvent.description && (
+                        <div>
+                          <span className="text-gray-500">الوصف:</span>
+                          <p className="mt-1 text-gray-300">{selectedEvent.description}</p>
+                        </div>
+                      )}
+                      {!!selectedEvent.long_description && (
+                        <div>
+                          <span className="text-gray-500">التفاصيل:</span>
+                          <p className="mt-1 text-gray-300">{selectedEvent.long_description}</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Timeline */}
+                <div className="border-t border-dark-600/50 pt-6">
+                  <h5 className="font-semibold text-gray-300 mb-4">السجل الزمني</h5>
+                  <div className="space-y-3 max-h-48 overflow-y-auto mobile-scroll-smooth">
+                    {(logs[selectedEvent.case_ref] || []).map(log => (
+                      <div key={log.id} className="p-3 bg-dark-700/50 rounded-lg border border-dark-600/30">
+                        <div className="flex items-center gap-2 text-xs mb-2">
+                          <span className="text-gray-500">{formatDateTime(log.created_at)}</span>
+                          <span className={`mobile-status-badge mobile-status-${log.kind === 'create' ? 'success' : log.kind === 'update' ? 'info' : log.kind === 'postpone' ? 'warning' : log.kind === 'close' ? 'neutral' : log.kind === 'reopen' ? 'success' : log.kind === 'delete' ? 'danger' : 'info'}`}>
+                            {log.kind === 'create' ? 'إنشاء' : log.kind === 'update' ? 'تحديث' : log.kind === 'postpone' ? 'تأجيل' : log.kind === 'close' ? 'إغلاق' : log.kind === 'reopen' ? 'إعادة فتح' : log.kind === 'delete' ? 'حذف' : 'ملاحظة'}
+                          </span>
+                        </div>
+                        {log.message && <p className="text-sm text-gray-300">{log.message}</p>}
+                      </div>
+                    ))}
+                    {(!logs[selectedEvent.case_ref] || logs[selectedEvent.case_ref].length === 0) && (
+                      <div className="text-center py-4 text-gray-500 text-sm">لا يوجد سجل زمني</div>
+                    )}
+                  </div>
+                  {authStatus.isLoggedIn && (
+                    <div className="flex gap-2 mt-4">
+                      <input 
+                        value={noteText} 
+                        onChange={e => setNoteText(e.target.value)} 
+                        placeholder="أضف ملاحظة..." 
+                        className="mobile-field flex-1" 
+                        onKeyDown={e => e.key === 'Enter' && handleAddNote()} 
+                      />
+                      <button 
+                        onClick={handleAddNote} 
+                        disabled={!noteText.trim()} 
+                        className="mobile-btn mobile-btn-primary disabled:opacity-50"
+                      >
+                        إضافة
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {authStatus.isLoggedIn && (
-                <div className="flex-1 p-4 sm:p-6">
-                  <h4 className="font-semibold mb-4 text-gray-300">إضافة قضية جديدة</h4>
-                  <div className="space-y-3">
-                    <input value={newEvent.title} onChange={e => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="عنوان القضية *" className="w-full p-3 rounded-lg border bg-dark-800 border-dark-600" />
-                    <AutocompleteInput
-                      value={newEvent.court_name}
-                      onChange={v => setNewEvent({ ...newEvent, court_name: v })}
-                      placeholder="اسم المحكمة"
-                      fetcher={getCourtSuggestions}
-                      mruKey="mru:courts"
-                    />
-                    <TokenInput
-                      tokens={newEvent.lawyers}
-                      onTokensChange={t => setNewEvent({ ...newEvent, lawyers: t })}
-                      placeholder="أسماء المحامين"
-                      fetcher={getLawyerSuggestions}
-                      mruKey="mru:lawyers"
-                    />
-                    <AutocompleteInput
-                      value={newEvent.reviewer}
-                      onChange={v => setNewEvent({ ...newEvent, reviewer: v })}
-                      placeholder="اسم المراجع"
-                      fetcher={getReviewerSuggestions}
-                      mruKey="mru:reviewers"
-                    />
-                    <textarea value={newEvent.description} onChange={e => setNewEvent({ ...newEvent, description: e.target.value })} placeholder="وصف مختصر للقضية" rows={3} className="w-full p-3 rounded-lg border bg-dark-800 border-dark-600" />
-                    <textarea value={newEvent.long_description} onChange={e => setNewEvent({ ...newEvent, long_description: e.target.value })} placeholder="تفاصيل إضافية" rows={4} className="w-full p-3 rounded-lg border bg-dark-800 border-dark-600" />
-                    <button onClick={handleCreateEvent} disabled={!newEvent.title || addingEvent} className="btn-primary w-full disabled:opacity-50">{addingEvent ? 'جاري الإضافة...' : 'إضافة القضية'}</button>
-                    <p className="text-xs text-gray-500 text-center">يبقى النموذج مفتوحًا لإضافة قضايا أخرى في نفس اليوم</p>
-                  </div>
+            </div>
+            <div className="mobile-modal-footer">
+              {editMode && authStatus.isLoggedIn ? (
+                <div className="flex gap-2">
+                  <button onClick={handleUpdateEvent} className="mobile-btn mobile-btn-primary flex-1">حفظ التعديلات</button>
+                  <button onClick={() => setEditMode(false)} className="mobile-btn mobile-btn-secondary">إلغاء</button>
+                </div>
+              ) : authStatus.isLoggedIn && (
+                <div className="flex flex-wrap gap-2">
+                  {selectedEvent.status !== 'closed' && (
+                    <>
+                      <button onClick={() => setPostponingEvent(selectedEvent)} className="mobile-btn mobile-btn-secondary flex-1">تأجيل</button>
+                      <button onClick={() => handleStatusChange(selectedEvent, 'closed')} className="mobile-btn mobile-btn-secondary flex-1">إغلاق</button>
+                    </>
+                  )}
+                  {selectedEvent.status === 'closed' && (
+                    <button onClick={() => handleStatusChange(selectedEvent, 'open')} className="mobile-btn mobile-btn-secondary flex-1">إعادة فتح</button>
+                  )}
+                  <button onClick={() => handleDelete(selectedEvent)} className="mobile-btn mobile-btn-danger">حذف</button>
                 </div>
               )}
             </div>
@@ -691,160 +954,60 @@ export default function Calendar() {
         </div>
       )}
 
-      {selectedEvent && (
-        <div className="modal-backdrop" onClick={() => setSelectedEvent(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-dark-700 flex items-center justify-between">
-              <h3 className="text-xl font-bold">تفاصيل القضية</h3>
-              <button onClick={() => setSelectedEvent(null)} className="p-2 hover:bg-dark-700 rounded-lg">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+      {/* Postpone Modal */}
+      {postponingEvent && (
+        <div className="mobile-modal-backdrop" onClick={() => setPostponingEvent(null)}>
+          <div className="mobile-modal" onClick={e => e.stopPropagation()}>
+            <div className="mobile-modal-header">
+              <h3 className="mobile-modal-title">تأجيل القضية</h3>
+              <button onClick={() => setPostponingEvent(null)} className="mobile-modal-close">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
-            <div className="overflow-y-auto max-h-[72vh]">
-              <div className="p-6 space-y-4 border-b border-dark-700">
-                {editMode && authStatus.isLoggedIn ? (
-                  <>
-                    <input value={editData.title} onChange={e => setEditData({ ...editData, title: e.target.value })} className="w-full p-3 rounded-lg border bg-dark-800 border-dark-600" />
-                    <AutocompleteInput
-                      value={editData.court_name}
-                      onChange={v => setEditData({ ...editData, court_name: v })}
-                      placeholder="المحكمة"
-                      fetcher={getCourtSuggestions}
-                      mruKey="mru:courts"
-                    />
-                    <TokenInput
-                      tokens={editData.lawyers}
-                      onTokensChange={t => setEditData({ ...editData, lawyers: t })}
-                      placeholder="المحامون"
-                      fetcher={getLawyerSuggestions}
-                      mruKey="mru:lawyers"
-                    />
-                    <AutocompleteInput
-                      value={editData.reviewer}
-                      onChange={v => setEditData({ ...editData, reviewer: v })}
-                      placeholder="المراجع"
-                      fetcher={getReviewerSuggestions}
-                      mruKey="mru:reviewers"
-                    />
-                    <textarea value={editData.description} onChange={e => setEditData({ ...editData, description: e.target.value })} rows={2} className="w-full p-3 rounded-lg border bg-dark-800 border-dark-600" />
-                    <textarea value={editData.long_description} onChange={e => setEditData({ ...editData, long_description: e.target.value })} rows={3} className="w-full p-3 rounded-lg border bg-dark-800 border-dark-600" />
-                    <div className="flex gap-2">
-                      <button onClick={handleUpdateEvent} className="btn-primary">حفظ التعديلات</button>
-                      <button onClick={() => setEditMode(false)} className="btn-secondary">إلغاء</button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="text-lg font-semibold text-blue-400 mb-2">{selectedEvent.title}</h4>
-                        <div className="inline-flex items-center gap-2 mb-3">
-                          <span className={`status-badge ${selectedEvent.status === 'closed' ? 'bg-gray-900/30 text-gray-400 border-gray-600' : selectedEvent.status === 'postponed' ? 'bg-yellow-900/30 text-yellow-400 border-yellow-600' : 'bg-green-900/30 text-green-400 border-green-600'}`}>
-                            {selectedEvent.status === 'closed' ? 'مغلقة' : selectedEvent.status === 'postponed' ? 'مؤجلة' : 'مفتوحة'}
-                          </span>
-                          {selectedEvent.status === 'postponed' && selectedEvent.postponed_to && <span className="text-sm text-yellow-400">إلى {formatDate(selectedEvent.postponed_to)}</span>}
-                        </div>
-                      </div>
-                      {authStatus.isLoggedIn && <button onClick={() => setEditMode(true)} className="p-2 hover:bg-dark-700 rounded-lg"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>}
-                    </div>
-                    <div className="space-y-2 text-sm">
-                      <div><span className="text-gray-500">التاريخ:</span> {formatDate(selectedEvent.date)}</div>
-                      {!!selectedEvent.court_name && <div><span className="text-gray-500">المحكمة:</span> {selectedEvent.court_name}</div>}
-                      {!!selectedEvent.reviewer && <div><span className="text-gray-500">المراجع:</span> {selectedEvent.reviewer}</div>}
-                      {selectedEvent.lawyers && selectedEvent.lawyers.length > 0 && (
-                        <div>
-                          <span className="text-gray-500">المحامون:</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {selectedEvent.lawyers.map((l, i) => (<span key={i} className="px-2 py-1 bg-dark-700 rounded-full text-xs">{l}</span>))}
-                          </div>
-                        </div>
-                      )}
-                      {!!selectedEvent.description && <div><span className="text-gray-500">الوصف:</span> {selectedEvent.description}</div>}
-                      {!!selectedEvent.long_description && <div><span className="text-gray-500">التفاصيل:</span> {selectedEvent.long_description}</div>}
-                    </div>
-                    {authStatus.isLoggedIn && (
-                      <div className="flex flex-wrap gap-2 pt-4">
-                        {selectedEvent.status !== 'closed' && (
-                          <>
-                            <button onClick={() => setPostponingEvent(selectedEvent)} className="btn-secondary">تأجيل</button>
-                            <button onClick={() => handleStatusChange(selectedEvent, 'closed')} className="btn-secondary">إغلاق</button>
-                          </>
-                        )}
-                        {selectedEvent.status === 'closed' && <button onClick={() => handleStatusChange(selectedEvent, 'open')} className="btn-secondary">إعادة فتح</button>}
-                        <button onClick={() => handleDelete(selectedEvent)} className="btn-danger">حذف</button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-
-              <div className="p-6 space-y-4">
-                <h5 className="font-semibold text-gray-300">السجل الزمني</h5>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {(logs[selectedEvent.case_ref] || []).map(log => (
-                    <div key={log.id} className="p-3 bg-dark-700/50 rounded-lg border border-dark-600">
-                      <div className="flex items-center gap-2 text-xs mb-1">
-                        <span className="text-gray-500">{formatDateTime(log.created_at)}</span>
-                        <span className={`px-2 py-0.5 rounded-full ${log.kind === 'create' ? 'bg-green-900/30 text-green-400' : log.kind === 'update' ? 'bg-blue-900/30 text-blue-400' : log.kind === 'postpone' ? 'bg-yellow-900/30 text-yellow-400' : log.kind === 'close' ? 'bg-gray-900/30 text-gray-400' : log.kind === 'reopen' ? 'bg-green-900/30 text-green-400' : log.kind === 'delete' ? 'bg-red-900/30 text-red-400' : 'bg-purple-900/30 text-purple-400'}`}>
-                          {log.kind === 'create' ? 'إنشاء' : log.kind === 'update' ? 'تحديث' : log.kind === 'postpone' ? 'تأجيل' : log.kind === 'close' ? 'إغلاق' : log.kind === 'reopen' ? 'إعادة فتح' : log.kind === 'delete' ? 'حذف' : 'ملاحظة'}
-                        </span>
-                        {log.actor && <span className="text-gray-500">بواسطة: {log.actor}</span>}
-                      </div>
-                      {log.message && <p className="text-sm text-gray-300">{log.message}</p>}
-                      {log.kind === 'postpone' && log.from_date && log.to_date && <p className="text-sm text-yellow-400 mt-1">من {formatDate(log.from_date)} إلى {formatDate(log.to_date)}</p>}
-                      {log.changes && typeof log.changes === 'object' && Object.keys(log.changes || {}).length > 0 && (
-                        <div className="mt-2 space-y-1">
-                          {Object.entries(log.changes || {}).map(([field, values]: any) => (
-                            <div key={field} className="text-xs flex items-center gap-2">
-                              <span className="text-gray-500 min-w-[90px]">
-                                {field === 'title' ? 'العنوان' : field === 'court_name' ? 'المحكمة' : field === 'reviewer' ? 'المراجع' : field === 'lawyers' ? 'المحامون' : field === 'description' ? 'الوصف' : field === 'long_description' ? 'التفاصيل' : field === 'status' ? 'الحالة' : field === 'date' ? 'التاريخ' : field === 'postponed_to' ? 'مؤجلة إلى' : field}:
-                              </span>
-                              {values?.old && <span className="line-through text-red-400/70">{String(values.old)}</span>}
-                              {values?.old && values?.new && <span className="text-gray-500">←</span>}
-                              {values?.new && <span className="text-green-400">{String(values.new)}</span>}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {(!logs[selectedEvent.case_ref] || logs[selectedEvent.case_ref].length === 0) && <div className="text-center py-4 text-gray-500 text-sm">لا يوجد سجل زمني</div>}
+            <div className="mobile-modal-body">
+              <div className="space-y-4">
+                <p className="text-gray-300">تأجيل: <strong className="text-blue-400">{postponingEvent.title}</strong></p>
+                <p className="text-sm text-gray-500">من تاريخ: {formatDate(postponingEvent.date)}</p>
+                <div className="mobile-field-group">
+                  <label className="mobile-field-label">التاريخ الجديد</label>
+                  <input 
+                    type="date" 
+                    value={postponeDate} 
+                    onChange={e => setPostponeDate(e.target.value)} 
+                    min={format(new Date(), 'yyyy-MM-dd')} 
+                    className="mobile-field" 
+                  />
                 </div>
-                {authStatus.isLoggedIn && (
-                  <div className="flex gap-2">
-                    <input value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="أضف ملاحظة..." className="flex-1 p-2 rounded-lg border bg-dark-800 border-dark-600" onKeyDown={e => e.key === 'Enter' && handleAddNote()} />
-                    <button onClick={handleAddNote} disabled={!noteText.trim()} className="btn-primary">إضافة</button>
-                  </div>
-                )}
+              </div>
+            </div>
+            <div className="mobile-modal-footer">
+              <div className="flex gap-3">
+                <button 
+                  onClick={handlePostpone} 
+                  disabled={!postponeDate} 
+                  className="mobile-btn mobile-btn-primary flex-1 disabled:opacity-50"
+                >
+                  تأكيد التأجيل
+                </button>
+                <button 
+                  onClick={() => { setPostponingEvent(null); setPostponeDate('') }} 
+                  className="mobile-btn mobile-btn-secondary"
+                >
+                  إلغاء
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {postponingEvent && (
-        <div className="modal-backdrop" onClick={() => setPostponingEvent(null)}>
-          <div className="modal-content max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-dark-700">
-              <h3 className="text-xl font-bold">تأجيل القضية</h3>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-gray-300">تأجيل: <strong className="text-blue-400">{postponingEvent.title}</strong></p>
-              <p className="text-sm text-gray-500">من تاريخ: {formatDate(postponingEvent.date)}</p>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">التاريخ الجديد</label>
-                <input type="date" value={postponeDate} onChange={e => setPostponeDate(e.target.value)} min={format(new Date(), 'yyyy-MM-dd')} className="w-full p-3 rounded-lg border bg-dark-800 border-dark-600" />
-              </div>
-            </div>
-            <div className="p-6 border-t border-dark-700 flex gap-3">
-              <button onClick={handlePostpone} disabled={!postponeDate} className="btn-primary flex-1">تأكيد التأجيل</button>
-              <button onClick={() => { setPostponingEvent(null); setPostponeDate('') }} className="btn-secondary">إلغاء</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} onLogin={() => setAuthStatus(getAuthStatus())} />
+      <LoginModal 
+        isOpen={showLoginModal} 
+        onClose={() => setShowLoginModal(false)} 
+        onLogin={() => setAuthStatus(getAuthStatus())} 
+      />
     </div>
   )
 }
