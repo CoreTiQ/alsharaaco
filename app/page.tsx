@@ -78,8 +78,9 @@ function MobileAutocompleteInput(props: {
   fetcher: SuggestFetcher
   mruKey: string
   onSelect?: (v: string) => void
+  icon?: string
 }) {
-  const { value, onChange, placeholder, fetcher, mruKey, onSelect } = props
+  const { value, onChange, placeholder, fetcher, mruKey, onSelect, icon } = props
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState(value)
   const debounced = useDebouncedValue(query, 200)
@@ -140,9 +141,21 @@ function MobileAutocompleteInput(props: {
               }}
               className="mobile-autocomplete-item"
             >
+              {icon && <span style={{ marginLeft: '8px' }}>{icon}</span>}
               {s}
             </button>
           ))}
+          {mru.length > 0 && (
+            <div style={{ 
+              padding: '4px 12px', 
+              fontSize: '0.6875rem', 
+              color: '#94a3b8', 
+              borderTop: '1px solid rgba(71, 85, 105, 0.3)',
+              textAlign: 'center'
+            }}>
+              الاقتراحات من الاستخدام السابق والقاعدة
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -187,9 +200,11 @@ function MobileTokenInput(props: {
   }, [])
 
   const addToken = (t: string) => {
-    const next = uniq([...tokens, t])
+    const trimmed = t.trim()
+    if (!trimmed) return
+    const next = uniq([...tokens, trimmed])
     onTokensChange(next)
-    pushMRU(mruKey, t)
+    pushMRU(mruKey, trimmed)
     setInput('')
     setOpen(false)
   }
@@ -210,6 +225,7 @@ function MobileTokenInput(props: {
               type="button"
               onClick={() => onTokensChange(tokens.filter(x => x !== t))}
               className="mobile-token-remove"
+              aria-label={`إزالة ${t}`}
             >
               ×
             </button>
@@ -230,7 +246,7 @@ function MobileTokenInput(props: {
               onTokensChange(tokens.slice(0, -1))
             }
           }}
-          placeholder={placeholder}
+          placeholder={tokens.length === 0 ? placeholder : 'إضافة محامي آخر...'}
           className="mobile-token-input-field"
         />
       </div>
@@ -243,9 +259,15 @@ function MobileTokenInput(props: {
               onClick={() => addToken(s)}
               className="mobile-autocomplete-item"
             >
+              <span style={{ marginLeft: '8px' }}>👤</span>
               {s}
             </button>
           ))}
+        </div>
+      )}
+      {tokens.length > 0 && (
+        <div style={{ marginTop: '4px', fontSize: '0.75rem', color: '#94a3b8' }}>
+          تم إضافة {tokens.length} محامي • اضغط Enter أو فاصلة لإضافة المزيد
         </div>
       )}
     </div>
@@ -369,9 +391,14 @@ export default function MobileCalendar() {
         .select()
       if (error) throw error
       setEvents(prev => [...prev, ...(data || [])])
-      if (newEvent.court_name) pushMRU('mru:courts', newEvent.court_name)
-      if (newEvent.reviewer) pushMRU('mru:reviewers', newEvent.reviewer)
-      newEvent.lawyers.forEach(l => pushMRU('mru:lawyers', l))
+      
+      // Save to MRU lists for future suggestions
+      if (newEvent.court_name.trim()) pushMRU('mru:courts', newEvent.court_name.trim())
+      if (newEvent.reviewer.trim()) pushMRU('mru:reviewers', newEvent.reviewer.trim())
+      newEvent.lawyers.forEach(lawyer => {
+        if (lawyer.trim()) pushMRU('mru:lawyers', lawyer.trim())
+      })
+      
       setNewEvent({ title: '', court_name: '', lawyers: [], reviewer: '', description: '', long_description: '' })
       toast.success('تمت إضافة القضية بنجاح')
     } catch {
@@ -401,9 +428,13 @@ export default function MobileCalendar() {
       if (updated) {
         setEvents(prev => prev.map(e => (e.id === selectedEvent.id ? updated : e)))
         setSelectedEvent(updated)
-        if (editData.court_name) pushMRU('mru:courts', editData.court_name)
-        if (editData.reviewer) pushMRU('mru:reviewers', editData.reviewer)
-        editData.lawyers.forEach(l => pushMRU('mru:lawyers', l))
+        
+        // Save to MRU lists for future suggestions
+        if (editData.court_name.trim()) pushMRU('mru:courts', editData.court_name.trim())
+        if (editData.reviewer.trim()) pushMRU('mru:reviewers', editData.reviewer.trim())
+        editData.lawyers.forEach(lawyer => {
+          if (lawyer.trim()) pushMRU('mru:lawyers', lawyer.trim())
+        })
       }
       setEditMode(false)
       toast.success('تم التحديث')
@@ -488,7 +519,34 @@ export default function MobileCalendar() {
     }
   }
 
+  const getLawyerSuggestions: SuggestFetcher = async q => {
+    // Get from database
+    const { data } = await supabase.from('events').select('lawyers').not('lawyers', 'is', null).order('created_at', { ascending: false }).limit(1000)
+    const vals: string[] = []
+    ;(data || []).forEach(r => {
+      const arr = (r as any).lawyers as string[] | null
+      if (Array.isArray(arr)) arr.forEach(x => vals.push(x))
+    })
+    
+    // Filter by query if provided
+    const filtered = q ? vals.filter(v => v.toLowerCase().includes(q.toLowerCase())) : vals
+    
+    // Get frequency count
+    const freq = new Map<string, number>()
+    filtered.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
+    
+    // Sort by frequency (most used first)
+    const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
+    
+    // Get MRU (Most Recently Used) from localStorage
+    const mru = readMRU('mru:lawyers')
+    
+    // Merge and deduplicate: MRU first, then database results
+    return mergeSuggestions(dbResults, mru)
+  }
+
   const getCourtSuggestions: SuggestFetcher = async q => {
+    // Get from database
     const ilike = q ? `%${q}%` : '%'
     const { data } = await supabase
       .from('events')
@@ -498,12 +556,23 @@ export default function MobileCalendar() {
       .order('created_at', { ascending: false })
       .limit(1000)
     const vals = (data || []).map(r => String((r as any).court_name))
+    
+    // Get frequency count
     const freq = new Map<string, number>()
     vals.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
-    return [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
+    
+    // Sort by frequency (most used first)
+    const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
+    
+    // Get MRU from localStorage
+    const mru = readMRU('mru:courts')
+    
+    // Merge: MRU first, then database results
+    return mergeSuggestions(dbResults, mru)
   }
 
   const getReviewerSuggestions: SuggestFetcher = async q => {
+    // Get from database
     const ilike = q ? `%${q}%` : '%'
     const { data } = await supabase
       .from('events')
@@ -513,22 +582,19 @@ export default function MobileCalendar() {
       .order('created_at', { ascending: false })
       .limit(1000)
     const vals = (data || []).map(r => String((r as any).reviewer))
+    
+    // Get frequency count
     const freq = new Map<string, number>()
     vals.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
-    return [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
-  }
-
-  const getLawyerSuggestions: SuggestFetcher = async q => {
-    const { data } = await supabase.from('events').select('lawyers').not('lawyers', 'is', null).order('created_at', { ascending: false }).limit(1000)
-    const vals: string[] = []
-    ;(data || []).forEach(r => {
-      const arr = (r as any).lawyers as string[] | null
-      if (Array.isArray(arr)) arr.forEach(x => vals.push(x))
-    })
-    const filtered = q ? vals.filter(v => v.toLowerCase().includes(q.toLowerCase())) : vals
-    const freq = new Map<string, number>()
-    filtered.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
-    return [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
+    
+    // Sort by frequency (most used first)
+    const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
+    
+    // Get MRU from localStorage
+    const mru = readMRU('mru:reviewers')
+    
+    // Merge: MRU first, then database results
+    return mergeSuggestions(dbResults, mru)
   }
 
   const handleLogout = () => {
@@ -687,17 +753,18 @@ export default function MobileCalendar() {
                         <MobileAutocompleteInput
                           value={newEvent.court_name}
                           onChange={v => setNewEvent({ ...newEvent, court_name: v })}
-                          placeholder="اختر أو أدخل اسم المحكمة"
+                          placeholder="اختر أو اكتب اسم المحكمة"
                           fetcher={getCourtSuggestions}
                           mruKey="mru:courts"
+                          icon="🏛️"
                         />
                       </div>
                       <div className="mobile-field-group">
-                        <label className="mobile-field-label">أسماء المحامين</label>
+                        <label className="mobile-field-label">المحامون</label>
                         <MobileTokenInput
                           tokens={newEvent.lawyers}
                           onTokensChange={t => setNewEvent({ ...newEvent, lawyers: t })}
-                          placeholder="أضف أسماء المحامين"
+                          placeholder="اختر أو اكتب أسماء المحامين"
                           fetcher={getLawyerSuggestions}
                           mruKey="mru:lawyers"
                         />
@@ -707,9 +774,10 @@ export default function MobileCalendar() {
                         <MobileAutocompleteInput
                           value={newEvent.reviewer}
                           onChange={v => setNewEvent({ ...newEvent, reviewer: v })}
-                          placeholder="اختر أو أدخل اسم المراجع"
+                          placeholder="اختر أو اكتب اسم المراجع"
                           fetcher={getReviewerSuggestions}
                           mruKey="mru:reviewers"
+                          icon="👨‍💼"
                         />
                       </div>
                       <div className="mobile-field-group">
@@ -785,6 +853,7 @@ export default function MobileCalendar() {
                         placeholder="اسم المحكمة"
                         fetcher={getCourtSuggestions}
                         mruKey="mru:courts"
+                        icon="🏛️"
                       />
                     </div>
                     <div className="mobile-field-group">
@@ -805,6 +874,7 @@ export default function MobileCalendar() {
                         placeholder="اسم المراجع"
                         fetcher={getReviewerSuggestions}
                         mruKey="mru:reviewers"
+                        icon="👨‍💼"
                       />
                     </div>
                     <div className="mobile-field-group">
