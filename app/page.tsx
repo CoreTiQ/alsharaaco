@@ -2,12 +2,36 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns'
 import { ar } from 'date-fns/locale'
-import { supabase, Event, EventLog, safeUpdate, safeInsert, testConnection } from '@/lib/supabaseClient'
+import {
+  supabase,
+  Case,
+  CaseSession,
+  ActivityLog,
+  fetchMonthSessions,
+  createCaseAndSession,
+  postponeSession,
+  completeSession,
+  updateCase,
+  addNoteToLog
+} from '@/lib/supabaseClient'
 import { getAuthStatus, logout } from '@/lib/auth'
 import LoginModal from '@/components/LoginModal'
 import toast from 'react-hot-toast'
 
 type SuggestFetcher = (q: string) => Promise<string[]>
+
+type CalendarRow = {
+  session_id: string
+  session_date: string
+  session_status: 'scheduled' | 'completed' | 'postponed' | 'cancelled'
+  postponed_to: string | null
+  case_id: string
+  title: string
+  court_name: string | null
+  lawyers: string[] | null
+  reviewer: string | null
+  case_status: 'active' | 'completed' | 'cancelled'
+}
 
 function useDebouncedValue<T>(value: T, delay = 200) {
   const [v, setV] = useState(value)
@@ -146,10 +170,10 @@ function MobileAutocompleteInput(props: {
             </button>
           ))}
           {mru.length > 0 && (
-            <div style={{ 
-              padding: '4px 12px', 
-              fontSize: '0.6875rem', 
-              color: '#94a3b8', 
+            <div style={{
+              padding: '4px 12px',
+              fontSize: '0.6875rem',
+              color: '#94a3b8',
               borderTop: '1px solid rgba(71, 85, 105, 0.3)',
               textAlign: 'center'
             }}>
@@ -185,9 +209,7 @@ function MobileTokenInput(props: {
       if (!ignore) setItems(merged)
     }
     run()
-    return () => {
-      ignore = true
-    }
+    return () => { ignore = true }
   }, [debounced, fetcher, mru, tokens])
 
   useEffect(() => {
@@ -274,34 +296,49 @@ function MobileTokenInput(props: {
   )
 }
 
-export default function MobileCalendar() {
+export default function Page() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [events, setEvents] = useState<Event[]>([])
+  const [rows, setRows] = useState<CalendarRow[]>([])
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [showDayModal, setShowDayModal] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
-  const [logs, setLogs] = useState<Record<string, EventLog[]>>({})
+  const [selectedRow, setSelectedRow] = useState<CalendarRow | null>(null)
+  const [logs, setLogs] = useState<ActivityLog[]>([])
   const [loading, setLoading] = useState(false)
   const [authStatus, setAuthStatus] = useState(getAuthStatus())
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [postponeDate, setPostponeDate] = useState('')
-  const [postponingEvent, setPostponingEvent] = useState<Event | null>(null)
+  const [postponing, setPostponing] = useState<CalendarRow | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [noteText, setNoteText] = useState('')
-  const [addingEvent, setAddingEvent] = useState(false)
+  const [adding, setAdding] = useState(false)
 
-  const [newEvent, setNewEvent] = useState({
+  const [newCase, setNewCase] = useState<{
+    title: string
+    court_name: string
+    lawyers: string[]
+    reviewer: string
+    description: string
+    long_description: string
+  }>({
     title: '',
     court_name: '',
-    lawyers: [] as string[],
+    lawyers: [],
     reviewer: '',
     description: '',
     long_description: ''
   })
-  const [editData, setEditData] = useState({
+
+  const [editCaseData, setEditCaseData] = useState<{
+    title: string
+    court_name: string
+    lawyers: string[]
+    reviewer: string
+    description: string
+    long_description: string
+  }>({
     title: '',
     court_name: '',
-    lawyers: [] as string[],
+    lawyers: [],
     reviewer: '',
     description: '',
     long_description: ''
@@ -314,26 +351,20 @@ export default function MobileCalendar() {
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
 
   useEffect(() => {
-    fetchEvents()
+    loadMonth()
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js')
-    testConnection()
   }, [currentMonth])
 
-  const fetchEvents = async () => {
+  const loadMonth = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .gte('date', format(monthStart, 'yyyy-MM-dd'))
-        .lte('date', format(monthEnd, 'yyyy-MM-dd'))
-        .neq('status', 'deleted')
-        .order('date', { ascending: true })
-        .order('created_at', { ascending: false })
+      const { data, error } = await fetchMonthSessions(
+        format(monthStart, 'yyyy-MM-dd'),
+        format(monthEnd, 'yyyy-MM-dd')
+      )
       if (error) throw error
-      setEvents(data || [])
-    } catch (error: any) {
-      console.error('Fetch events error:', error)
+      setRows((data || []) as any)
+    } catch {
       toast.error('فشل تحميل البيانات')
     } finally {
       setLoading(false)
@@ -344,350 +375,193 @@ export default function MobileCalendar() {
   const formatDateISO = (date: Date) => format(date, 'yyyy-MM-dd')
   const formatDateTime = (date: string) => format(new Date(date), 'dd/MM/yyyy HH:mm')
   const isCurrentMonth = (date: Date) => date.getMonth() === currentMonth.getMonth()
-  const dayEvents = (d: Date) => events.filter(e => isSameDay(new Date(e.date), d))
+  const dayRows = (d: Date) => rows.filter(r => isSameDay(new Date(r.session_date), d))
 
   const openDay = (d: Date) => {
     setSelectedDate(d)
     setShowDayModal(true)
-    setNewEvent({ title: '', court_name: '', lawyers: [], reviewer: '', description: '', long_description: '' })
-  }
-
-  const fetchLogs = async (caseRef: string) => {
-    if (logs[caseRef]) return
-    const { data, error } = await supabase.from('event_logs').select('*').eq('case_ref', caseRef).order('created_at', { ascending: true })
-    if (!error && data) setLogs(prev => ({ ...prev, [caseRef]: data }))
-  }
-
-  const openEventDetails = async (event: Event) => {
-    setSelectedEvent(event)
-    setEditMode(false)
-    setEditData({
-      title: event.title,
-      court_name: event.court_name || '',
-      lawyers: (event.lawyers || []) as string[],
-      reviewer: event.reviewer || '',
-      description: event.description || '',
-      long_description: event.long_description || ''
+    setNewCase({
+      title: '',
+      court_name: '',
+      lawyers: [],
+      reviewer: '',
+      description: '',
+      long_description: ''
     })
-    await fetchLogs(event.case_ref)
   }
 
-  const handleCreateEvent = async () => {
-    if (!authStatus.isLoggedIn || !newEvent.title || !selectedDate) return
-    setAddingEvent(true)
-    
+  const openRowDetails = async (row: CalendarRow) => {
+    setSelectedRow(row)
+    setEditMode(false)
+    setEditCaseData({
+      title: row.title,
+      court_name: row.court_name || '',
+      lawyers: (row.lawyers || []) as string[],
+      reviewer: row.reviewer || '',
+      description: '',
+      long_description: ''
+    })
+    const { data } = await supabase
+      .from('activity_logs')
+      .select('*')
+      .eq('case_id', row.case_id)
+      .order('created_at', { ascending: true })
+    setLogs((data || []) as ActivityLog[])
+  }
+
+  const handleCreate = async () => {
+    if (!authStatus.isLoggedIn || !newCase.title || !selectedDate) return
+    setAdding(true)
     try {
-      const eventData = {
-        date: formatDateISO(selectedDate),
-        title: newEvent.title,
-        court_name: newEvent.court_name || null,
-        lawyers: newEvent.lawyers.length ? newEvent.lawyers : null,
-        reviewer: newEvent.reviewer || null,
-        description: newEvent.description || null,
-        long_description: newEvent.long_description || null,
-        status: 'open'
-      }
-      
-      const { data, error } = await safeInsert('events', eventData)
-      
-      if (error) {
-        throw new Error(error)
-      }
-      
-      setEvents(prev => [...prev, ...(data || [])])
-      
-      if (newEvent.court_name.trim()) pushMRU('mru:courts', newEvent.court_name.trim())
-      if (newEvent.reviewer.trim()) pushMRU('mru:reviewers', newEvent.reviewer.trim())
-      newEvent.lawyers.forEach(lawyer => {
-        if (lawyer.trim()) pushMRU('mru:lawyers', lawyer.trim())
+      const { caseRow, sessionRow } = await createCaseAndSession({
+        title: newCase.title,
+        court_name: newCase.court_name || null,
+        lawyers: newCase.lawyers.length ? newCase.lawyers : null,
+        reviewer: newCase.reviewer || null,
+        description: newCase.description || null,
+        long_description: newCase.long_description || null,
+        session_date: formatDateISO(selectedDate)
       })
-      
-      setNewEvent({ title: '', court_name: '', lawyers: [], reviewer: '', description: '', long_description: '' })
-      toast.success('تمت إضافة القضية بنجاح')
-      
-    } catch (error: any) {
-      console.error('Create event error:', error)
-      toast.error(error.message || 'فشلت الإضافة')
+
+      pushMRU('mru:courts', (caseRow.court_name || '').trim())
+      pushMRU('mru:reviewers', (caseRow.reviewer || '').trim())
+      ;(caseRow.lawyers || []).forEach(l => l && pushMRU('mru:lawyers', l.trim()))
+
+      setNewCase({ title: '', court_name: '', lawyers: [], reviewer: '', description: '', long_description: '' })
+      await loadMonth()
+      toast.success('تمت إضافة القضية والجلسة')
+    } catch {
+      toast.error('فشلت الإضافة')
     } finally {
-      setAddingEvent(false)
+      setAdding(false)
     }
   }
 
-  const handleUpdateEvent = async () => {
-    if (!selectedEvent || !authStatus.isLoggedIn) return
-    
+  const handleUpdateCase = async () => {
+    if (!selectedRow || !authStatus.isLoggedIn) return
     try {
-      if (!editData.title?.trim()) {
-        toast.error('عنوان القضية مطلوب')
-        return
+      const { data, error } = await updateCase(selectedRow.case_id, {
+        title: editCaseData.title,
+        court_name: editCaseData.court_name || null,
+        lawyers: editCaseData.lawyers.length ? editCaseData.lawyers : null,
+        reviewer: editCaseData.reviewer || null,
+        description: editCaseData.description || null,
+        long_description: editCaseData.long_description || null
+      } as Partial<Case>)
+      if (error) throw error
+      if (data) {
+        setSelectedRow({
+          ...selectedRow,
+          title: data.title,
+          court_name: data.court_name,
+          lawyers: data.lawyers,
+          reviewer: data.reviewer
+        } as CalendarRow)
+        await loadMonth()
+        pushMRU('mru:courts', (data.court_name || '').trim())
+        pushMRU('mru:reviewers', (data.reviewer || '').trim())
+        ;(data.lawyers || []).forEach(l => l && pushMRU('mru:lawyers', l.trim()))
       }
-      
-      console.log('Starting controlled update')
-      
-      // البيانات المحدثة
-      const updateData = {
-        title: editData.title.trim(),
-        court_name: editData.court_name?.trim() || null,
-        lawyers: editData.lawyers?.length ? editData.lawyers : null,
-        reviewer: editData.reviewer?.trim() || null,
-        description: editData.description?.trim() || null,
-        long_description: editData.long_description?.trim() || null
-      }
-      
-      // محاولة التحديث العادي أولاً
-      const { data, error } = await supabase
-        .from('events')
-        .update(updateData)
-        .eq('id', selectedEvent.id)
-        .select()
-      
-      if (error) {
-        console.error('Update error:', error)
-        throw new Error(`خطأ في التحديث: ${error.message}`)
-      }
-      
-      const updated = data?.[0]
-      if (updated) {
-        setEvents(prev => prev.map(e => (e.id === selectedEvent.id ? updated : e)))
-        setSelectedEvent(updated)
-        
-        // حفظ في MRU
-        if (updateData.court_name) pushMRU('mru:courts', updateData.court_name)
-        if (updateData.reviewer) pushMRU('mru:reviewers', updateData.reviewer)
-        updateData.lawyers?.forEach(lawyer => {
-          if (lawyer?.trim()) pushMRU('mru:lawyers', lawyer.trim())
-        })
-        
-        // إضافة سجل زمني واحد فقط للتحديث
-        const { error: logError } = await supabase
-          .from('event_logs')
-          .insert([{
-            case_ref: selectedEvent.case_ref,
-            kind: 'update',
-            message: `تم تحديث بيانات القضية`,
-            actor: 'admin'
-          }])
-        
-        if (logError) {
-          console.warn('Log error (non-critical):', logError)
-        }
-      }
-      
       setEditMode(false)
-      toast.success('تم التحديث بنجاح')
-      
-    } catch (error: any) {
-      console.error('Update failed:', error)
-      toast.error(error.message || 'فشل التحديث')
+      toast.success('تم تحديث بيانات القضية')
+    } catch {
+      toast.error('فشل التحديث')
     }
   }
 
   const handlePostpone = async () => {
-    if (!postponingEvent || !postponeDate || !authStatus.isLoggedIn) return
-    
+    if (!postponing || !postponeDate || !authStatus.isLoggedIn) return
     try {
-      const validDate = new Date(postponeDate)
-      if (isNaN(validDate.getTime())) {
-        toast.error('صيغة التاريخ غير صحيحة')
-        return
-      }
-      
-      const formattedDate = format(validDate, 'yyyy-MM-dd')
-      
-      console.log('Starting postpone with controlled approach')
-      
-      // الخطوة الأولى: تحديث القضية الأصلية لتأجيل فقط (بدون حذف/إدراج)
-      const { error: updateError } = await supabase
-        .from('events')
-        .update({ 
-          status: 'postponed', 
-          postponed_to: formattedDate 
-        })
-        .eq('id', postponingEvent.id)
-      
-      if (updateError) {
-        console.error('Update error:', updateError)
-        throw new Error(`خطأ في تأجيل القضية: ${updateError.message}`)
-      }
-      
-      // الخطوة الثانية: إنشاء قضية جديدة بالتاريخ الجديد فقط
-      const newEventData = {
-        date: formattedDate,
-        title: postponingEvent.title,
-        court_name: postponingEvent.court_name,
-        lawyers: postponingEvent.lawyers,
-        reviewer: postponingEvent.reviewer,
-        description: postponingEvent.description,
-        long_description: postponingEvent.long_description,
-        status: 'open',
-        case_ref: postponingEvent.case_ref // نفس الـ case_ref للربط
-      }
-      
-      const { error: insertError } = await supabase
-        .from('events')
-        .insert([newEventData])
-      
-      if (insertError) {
-        console.error('Insert error:', insertError)
-        throw new Error(`خطأ في إنشاء القضية الجديدة: ${insertError.message}`)
-      }
-      
-      // الخطوة الثالثة: إضافة سجل زمني واحد فقط للتأجيل
-      const { error: logError } = await supabase
-        .from('event_logs')
-        .insert([{
-          case_ref: postponingEvent.case_ref,
-          kind: 'postpone',
-          message: `تم تأجيل القضية من ${formatDate(postponingEvent.date)} إلى ${formatDate(formattedDate)}`,
-          from_date: postponingEvent.date,
-          to_date: formattedDate,
-          actor: 'admin'
-        }])
-      
-      if (logError) {
-        console.warn('Log error (non-critical):', logError)
-      }
-      
-      await fetchEvents()
-      setPostponingEvent(null)
+      const { error } = await postponeSession(
+        { id: postponing.session_id, case_id: postponing.case_id, session_date: postponing.session_date, status: postponing.session_status, postponed_to: postponing.postponed_to, postpone_reason: null, notes: null, created_at: '' } as CaseSession,
+        postponeDate
+      )
+      if (error) throw error
+      await loadMonth()
+      setPostponing(null)
       setPostponeDate('')
-      toast.success('تم التأجيل بنجاح')
-      
-    } catch (error: any) {
-      console.error('Postpone failed:', error)
-      toast.error(error.message || 'فشل التأجيل')
+      toast.success('تم التأجيل')
+    } catch {
+      toast.error('فشل التأجيل')
     }
   }
 
-  const handleStatusChange = async (event: Event, newStatus: 'open' | 'closed') => {
+  const handleComplete = async (row: CalendarRow) => {
     if (!authStatus.isLoggedIn) return
     try {
-      const { data, error } = await safeUpdate('events', { status: newStatus }, { id: event.id })
-      
-      if (error) {
-        throw new Error(error)
-      }
-      
-      const updated = data?.[0]
-      if (updated) {
-        setEvents(prev => prev.map(e => (e.id === event.id ? updated : e)))
-        if (selectedEvent?.id === event.id) setSelectedEvent(updated)
-      }
-      toast.success(newStatus === 'closed' ? 'تم إغلاق القضية' : 'تم إعادة فتح القضية')
-    } catch (error: any) {
-      console.error('Status change error:', error)
-      toast.error(error.message || 'فشل التحديث')
-    }
-  }
-
-  const handleDelete = async (event: Event) => {
-    if (!authStatus.isLoggedIn || !confirm('هل تريد حذف هذه القضية؟')) return
-    try {
-      const { error } = await safeUpdate('events', { 
-        status: 'deleted', 
-        deleted_at: new Date().toISOString() 
-      }, { id: event.id })
-      
-      if (error) {
-        throw new Error(error)
-      }
-      
-      setEvents(prev => prev.filter(e => e.id !== event.id))
-      if (selectedEvent?.id === event.id) setSelectedEvent(null)
-      toast.success('تم الحذف')
-    } catch (error: any) {
-      console.error('Delete error:', error)
-      toast.error(error.message || 'فشل الحذف')
+      const { error } = await completeSession(row.session_id)
+      if (error) throw error
+      await loadMonth()
+      toast.success('تم إنهاء الجلسة')
+    } catch {
+      toast.error('فشل التحديث')
     }
   }
 
   const handleAddNote = async () => {
-    if (!selectedEvent || !noteText.trim() || !authStatus.isLoggedIn) return
+    if (!selectedRow || !noteText.trim() || !authStatus.isLoggedIn) return
     try {
-      const { data, error } = await safeInsert('event_logs', { 
-        case_ref: selectedEvent.case_ref, 
-        kind: 'note', 
-        message: noteText.trim(), 
-        actor: 'admin' 
-      })
-      
-      if (error) {
-        throw new Error(error)
-      }
-      
-      const added = data?.[0]
-      if (added) setLogs(prev => ({ ...prev, [selectedEvent.case_ref]: [...(prev[selectedEvent.case_ref] || []), added] }))
+      const { data, error } = await addNoteToLog(selectedRow.case_id, selectedRow.session_id, noteText.trim())
+      if (error) throw error
+      if (data) setLogs(prev => [...prev, data])
       setNoteText('')
       toast.success('تمت إضافة الملاحظة')
-    } catch (error: any) {
-      console.error('Add note error:', error)
-      toast.error(error.message || 'فشل إضافة الملاحظة')
+    } catch {
+      toast.error('فشل إضافة الملاحظة')
     }
   }
 
   const getLawyerSuggestions: SuggestFetcher = async q => {
-    try {
-      const { data } = await supabase.from('events').select('lawyers').not('lawyers', 'is', null).order('created_at', { ascending: false }).limit(1000)
-      const vals: string[] = []
-      ;(data || []).forEach(r => {
-        const arr = (r as any).lawyers as string[] | null
-        if (Array.isArray(arr)) arr.forEach(x => vals.push(x))
-      })
-      
-      const filtered = q ? vals.filter(v => v.toLowerCase().includes(q.toLowerCase())) : vals
-      const freq = new Map<string, number>()
-      filtered.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
-      const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
-      const mru = readMRU('mru:lawyers')
-      return mergeSuggestions(dbResults, mru)
-    } catch (error) {
-      console.error('Lawyer suggestions error:', error)
-      return readMRU('mru:lawyers')
-    }
+    const { data } = await supabase
+      .from('cases')
+      .select('lawyers, created_at')
+      .order('created_at', { ascending: false })
+      .limit(1000)
+    const vals: string[] = []
+    ;(data || []).forEach(r => {
+      const arr = (r as any).lawyers as string[] | null
+      if (Array.isArray(arr)) arr.forEach(x => vals.push(x))
+    })
+    const filtered = q ? vals.filter(v => v.toLowerCase().includes(q.toLowerCase())) : vals
+    const freq = new Map<string, number>()
+    filtered.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
+    const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
+    const mru = readMRU('mru:lawyers')
+    return mergeSuggestions(dbResults, mru)
   }
 
   const getCourtSuggestions: SuggestFetcher = async q => {
-    try {
-      const ilike = q ? `%${q}%` : '%'
-      const { data } = await supabase
-        .from('events')
-        .select('court_name')
-        .not('court_name', 'is', null)
-        .ilike('court_name', ilike)
-        .order('created_at', { ascending: false })
-        .limit(1000)
-      const vals = (data || []).map(r => String((r as any).court_name))
-      const freq = new Map<string, number>()
-      vals.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
-      const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
-      const mru = readMRU('mru:courts')
-      return mergeSuggestions(dbResults, mru)
-    } catch (error) {
-      console.error('Court suggestions error:', error)
-      return readMRU('mru:courts')
-    }
+    const ilike = q ? `%${q}%` : '%'
+    const { data } = await supabase
+      .from('cases')
+      .select('court_name, created_at')
+      .not('court_name', 'is', null)
+      .ilike('court_name', ilike)
+      .order('created_at', { ascending: false })
+      .limit(1000)
+    const vals = (data || []).map(r => String((r as any).court_name))
+    const freq = new Map<string, number>()
+    vals.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
+    const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
+    const mru = readMRU('mru:courts')
+    return mergeSuggestions(dbResults, mru)
   }
 
   const getReviewerSuggestions: SuggestFetcher = async q => {
-    try {
-      const ilike = q ? `%${q}%` : '%'
-      const { data } = await supabase
-        .from('events')
-        .select('reviewer')
-        .not('reviewer', 'is', null)
-        .ilike('reviewer', ilike)
-        .order('created_at', { ascending: false })
-        .limit(1000)
-      const vals = (data || []).map(r => String((r as any).reviewer))
-      const freq = new Map<string, number>()
-      vals.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
-      const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
-      const mru = readMRU('mru:reviewers')
-      return mergeSuggestions(dbResults, mru)
-    } catch (error) {
-      console.error('Reviewer suggestions error:', error)
-      return readMRU('mru:reviewers')
-    }
+    const ilike = q ? `%${q}%` : '%'
+    const { data } = await supabase
+      .from('cases')
+      .select('reviewer, created_at')
+      .not('reviewer', 'is', null)
+      .ilike('reviewer', ilike)
+      .order('created_at', { ascending: false })
+      .limit(1000)
+    const vals = (data || []).map(r => String((r as any).reviewer))
+    const freq = new Map<string, number>()
+    vals.forEach(v => freq.set(v, (freq.get(v) || 0) + 1))
+    const dbResults = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k)
+    const mru = readMRU('mru:reviewers')
+    return mergeSuggestions(dbResults, mru)
   }
 
   const handleLogout = () => {
@@ -716,22 +590,16 @@ export default function MobileCalendar() {
         <div className="mobile-calendar">
           <div className="mobile-calendar-nav">
             <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="mobile-calendar-nav-btn">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-              </svg>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
             </button>
             <h2 className="mobile-calendar-title">{format(currentMonth, 'MMMM yyyy', { locale: ar })}</h2>
             <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="mobile-calendar-nav-btn">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-              </svg>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
             </button>
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="mobile-loader" />
-            </div>
+            <div className="flex items-center justify-center py-20"><div className="mobile-loader" /></div>
           ) : (
             <div className="mobile-calendar-content">
               <div className="mobile-calendar-grid-container">
@@ -742,7 +610,7 @@ export default function MobileCalendar() {
                     ))}
                   </div>
                   {calendarDays.map(day => {
-                    const items = dayEvents(day)
+                    const items = dayRows(day)
                     const inMonth = isCurrentMonth(day)
                     return (
                       <button
@@ -752,9 +620,7 @@ export default function MobileCalendar() {
                       >
                         <div className="mobile-calendar-day-number">{format(day, 'd')}</div>
                         {items.length > 0 && (
-                          <div className="mobile-calendar-day-events">
-                            {items.length}
-                          </div>
+                          <div className="mobile-calendar-day-events">{items.length}</div>
                         )}
                       </button>
                     )
@@ -770,53 +636,58 @@ export default function MobileCalendar() {
         <div className="mobile-modal-backdrop" onClick={() => { setShowDayModal(false); setSelectedDate(null) }}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
             <div className="mobile-modal-header">
-              <h3 className="mobile-modal-title">قضايا يوم {formatDate(selectedDate)}</h3>
+              <h3 className="mobile-modal-title">جلسات يوم {formatDate(selectedDate)}</h3>
               <button onClick={() => { setShowDayModal(false); setSelectedDate(null) }} className="mobile-modal-close">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
+
             <div className="mobile-modal-body">
               <div className="space-y-6">
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-200 mb-4">القضايا المسجلة ({dayEvents(selectedDate).length})</h4>
+                  <h4 className="text-lg font-semibold text-gray-200 mb-4">الجلسات المسجلة ({dayRows(selectedDate).length})</h4>
                   <div className="space-y-3">
-                    {dayEvents(selectedDate).length === 0 && (
+                    {dayRows(selectedDate).length === 0 && (
                       <div className="text-center py-8 text-gray-500">
-                        <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <p className="text-lg">لا توجد قضايا في هذا اليوم</p>
+                        <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        <p className="text-lg">لا توجد جلسات في هذا اليوم</p>
                       </div>
                     )}
-                    {dayEvents(selectedDate).map(ev => (
-                      <div key={ev.id} className="p-4 bg-dark-700/60 rounded-xl border border-dark-600/50 backdrop-blur-sm">
+                    {dayRows(selectedDate).map(r => (
+                      <div key={r.session_id} className="p-4 bg-dark-700/60 rounded-xl border border-dark-600/50 backdrop-blur-sm">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-2">
-                              <span className={`mobile-status-badge ${ev.status === 'closed' ? 'mobile-status-neutral' : ev.status === 'postponed' ? 'mobile-status-warning' : 'mobile-status-success'}`}>
-                                {ev.status === 'closed' ? 'مغلقة' : ev.status === 'postponed' ? 'مؤجلة' : 'مفتوحة'}
+                              <span className={`mobile-status-badge ${
+                                r.session_status === 'completed' ? 'mobile-status-neutral' :
+                                r.session_status === 'postponed' ? 'mobile-status-warning' :
+                                r.session_status === 'cancelled' ? 'mobile-status-danger' : 'mobile-status-success'
+                              }`}>
+                                {r.session_status === 'completed' ? 'مكتملة' : r.session_status === 'postponed' ? 'مؤجلة' : r.session_status === 'cancelled' ? 'ملغاة' : 'مجدولة'}
                               </span>
                             </div>
-                            <h5 className="font-semibold text-blue-400 mb-2 text-lg">{ev.title}</h5>
-                            {ev.court_name && <p className="text-sm text-gray-400 mb-1">المحكمة: {ev.court_name}</p>}
-                            {ev.reviewer && <p className="text-sm text-gray-400 mb-1">المراجع: {ev.reviewer}</p>}
-                            {ev.lawyers && ev.lawyers.length > 0 && (
+                            <h5 className="font-semibold text-blue-400 mb-2 text-lg">{r.title}</h5>
+                            {r.court_name && <p className="text-sm text-gray-400 mb-1">المحكمة: {r.court_name}</p>}
+                            {r.reviewer && <p className="text-sm text-gray-400 mb-1">المراجع: {r.reviewer}</p>}
+                            {r.lawyers && r.lawyers.length > 0 && (
                               <div className="flex flex-wrap gap-1 mb-2">
-                                {ev.lawyers.map((l, i) => (
+                                {r.lawyers.map((l, i) => (
                                   <span key={i} className="px-2 py-1 bg-dark-800/60 rounded-full text-xs border border-dark-600/50">{l}</span>
                                 ))}
                               </div>
                             )}
-                            {ev.description && <p className="text-sm text-gray-300 mt-2">{ev.description}</p>}
-                            {ev.status === 'postponed' && ev.postponed_to && <p className="text-sm text-yellow-400 mt-2">مؤجلة إلى {formatDate(ev.postponed_to)}</p>}
+                            {r.session_status === 'postponed' && r.postponed_to && (
+                              <p className="text-sm text-yellow-400 mt-2">مؤجلة إلى {formatDate(r.postponed_to)}</p>
+                            )}
                           </div>
                         </div>
                         <div className="flex gap-2 mt-3 pt-3 border-t border-dark-600/30">
-                          <button onClick={() => openEventDetails(ev)} className="mobile-btn mobile-btn-secondary mobile-btn-sm flex-1">تفاصيل</button>
-                          {authStatus.isLoggedIn && ev.status === 'open' && (
-                            <button onClick={() => setPostponingEvent(ev)} className="mobile-btn mobile-btn-secondary mobile-btn-sm">تأجيل</button>
+                          <button onClick={() => openRowDetails(r)} className="mobile-btn mobile-btn-secondary mobile-btn-sm flex-1">تفاصيل</button>
+                          {authStatus.isLoggedIn && r.session_status !== 'completed' && r.session_status !== 'cancelled' && (
+                            <>
+                              <button onClick={() => setPostponing(r)} className="mobile-btn mobile-btn-secondary mobile-btn-sm">تأجيل</button>
+                              <button onClick={() => handleComplete(r)} className="mobile-btn mobile-btn-secondary mobile-btn-sm">إنهاء</button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -826,22 +697,22 @@ export default function MobileCalendar() {
 
                 {authStatus.isLoggedIn && (
                   <div className="border-t border-dark-600/50 pt-6">
-                    <h4 className="text-lg font-semibold text-gray-200 mb-4">إضافة قضية جديدة</h4>
+                    <h4 className="text-lg font-semibold text-gray-200 mb-4">إضافة قضية + جلسة</h4>
                     <div className="space-y-4">
                       <div className="mobile-field-group">
                         <label className="mobile-field-label">عنوان القضية *</label>
-                        <input 
-                          value={newEvent.title} 
-                          onChange={e => setNewEvent({ ...newEvent, title: e.target.value })} 
-                          placeholder="أدخل عنوان القضية" 
-                          className="mobile-field" 
+                        <input
+                          value={newCase.title}
+                          onChange={e => setNewCase({ ...newCase, title: e.target.value })}
+                          placeholder="أدخل عنوان القضية"
+                          className="mobile-field"
                         />
                       </div>
                       <div className="mobile-field-group">
                         <label className="mobile-field-label">اسم المحكمة</label>
                         <MobileAutocompleteInput
-                          value={newEvent.court_name}
-                          onChange={v => setNewEvent({ ...newEvent, court_name: v })}
+                          value={newCase.court_name}
+                          onChange={v => setNewCase({ ...newCase, court_name: v })}
                           placeholder="اختر أو اكتب اسم المحكمة"
                           fetcher={getCourtSuggestions}
                           mruKey="mru:courts"
@@ -851,8 +722,8 @@ export default function MobileCalendar() {
                       <div className="mobile-field-group">
                         <label className="mobile-field-label">المحامون</label>
                         <MobileTokenInput
-                          tokens={newEvent.lawyers}
-                          onTokensChange={t => setNewEvent({ ...newEvent, lawyers: t })}
+                          tokens={newCase.lawyers}
+                          onTokensChange={t => setNewCase({ ...newCase, lawyers: t })}
                           placeholder="اختر أو اكتب أسماء المحامين"
                           fetcher={getLawyerSuggestions}
                           mruKey="mru:lawyers"
@@ -861,8 +732,8 @@ export default function MobileCalendar() {
                       <div className="mobile-field-group">
                         <label className="mobile-field-label">اسم المراجع</label>
                         <MobileAutocompleteInput
-                          value={newEvent.reviewer}
-                          onChange={v => setNewEvent({ ...newEvent, reviewer: v })}
+                          value={newCase.reviewer}
+                          onChange={v => setNewCase({ ...newCase, reviewer: v })}
                           placeholder="اختر أو اكتب اسم المراجع"
                           fetcher={getReviewerSuggestions}
                           mruKey="mru:reviewers"
@@ -871,22 +742,22 @@ export default function MobileCalendar() {
                       </div>
                       <div className="mobile-field-group">
                         <label className="mobile-field-label">وصف مختصر</label>
-                        <textarea 
-                          value={newEvent.description} 
-                          onChange={e => setNewEvent({ ...newEvent, description: e.target.value })} 
-                          placeholder="وصف مختصر للقضية" 
-                          rows={3} 
-                          className="mobile-field" 
+                        <textarea
+                          value={newCase.description}
+                          onChange={e => setNewCase({ ...newCase, description: e.target.value })}
+                          placeholder="وصف مختصر للقضية"
+                          rows={3}
+                          className="mobile-field"
                         />
                       </div>
                       <div className="mobile-field-group">
                         <label className="mobile-field-label">تفاصيل إضافية</label>
-                        <textarea 
-                          value={newEvent.long_description} 
-                          onChange={e => setNewEvent({ ...newEvent, long_description: e.target.value })} 
-                          placeholder="تفاصيل إضافية أو ملاحظات" 
-                          rows={4} 
-                          className="mobile-field" 
+                        <textarea
+                          value={newCase.long_description}
+                          onChange={e => setNewCase({ ...newCase, long_description: e.target.value })}
+                          placeholder="تفاصيل إضافية أو ملاحظات"
+                          rows={4}
+                          className="mobile-field"
                         />
                       </div>
                     </div>
@@ -897,12 +768,12 @@ export default function MobileCalendar() {
 
             {authStatus.isLoggedIn && (
               <div className="mobile-modal-footer">
-                <button 
-                  onClick={handleCreateEvent} 
-                  disabled={!newEvent.title || addingEvent} 
+                <button
+                  onClick={handleCreate}
+                  disabled={!newCase.title || adding}
                   className="mobile-btn mobile-btn-primary mobile-btn-lg w-full disabled:opacity-50"
                 >
-                  {addingEvent ? 'جاري الإضافة...' : 'إضافة القضية'}
+                  {adding ? 'جاري الإضافة...' : 'إضافة القضية + الجلسة'}
                 </button>
               </div>
             )}
@@ -910,220 +781,266 @@ export default function MobileCalendar() {
         </div>
       )}
 
-      {selectedEvent && (
-        <div className="mobile-modal-backdrop" onClick={() => setSelectedEvent(null)}>
+      {selectedRow && (
+        <div className="mobile-modal-backdrop" onClick={() => setSelectedRow(null)}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
             <div className="mobile-modal-header">
               <h3 className="mobile-modal-title">تفاصيل القضية</h3>
-              <button onClick={() => setSelectedEvent(null)} className="mobile-modal-close">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button onClick={() => setSelectedRow(null)} className="mobile-modal-close">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
+
             <div className="mobile-modal-body">
               <div className="space-y-6">
                 {editMode && authStatus.isLoggedIn ? (
                   <>
                     <div className="mobile-field-group">
                       <label className="mobile-field-label">عنوان القضية</label>
-                      <input 
-                        value={editData.title} 
-                        onChange={e => setEditData({ ...editData, title: e.target.value })} 
-                        className="mobile-field" 
-                      />
-                    </div>
-                    <div className="mobile-field-group">
-                      <label className="mobile-field-label">المحكمة</label>
-                      <MobileAutocompleteInput
-                        value={editData.court_name}
-                        onChange={v => setEditData({ ...editData, court_name: v })}
-                        placeholder="اسم المحكمة"
-                        fetcher={getCourtSuggestions}
-                        mruKey="mru:courts"
-                        icon="🏛️"
-                      />
-                    </div>
-                    <div className="mobile-field-group">
-                      <label className="mobile-field-label">المحامون</label>
-                      <MobileTokenInput
-                        tokens={editData.lawyers}
-                        onTokensChange={t => setEditData({ ...editData, lawyers: t })}
-                        placeholder="أسماء المحامين"
-                        fetcher={getLawyerSuggestions}
-                        mruKey="mru:lawyers"
-                      />
-                    </div>
-                    <div className="mobile-field-group">
-                      <label className="mobile-field-label">المراجع</label>
-                      <MobileAutocompleteInput
-                        value={editData.reviewer}
-                        onChange={v => setEditData({ ...editData, reviewer: v })}
-                        placeholder="اسم المراجع"
-                        fetcher={getReviewerSuggestions}
-                        mruKey="mru:reviewers"
-                        icon="👨‍💼"
-                      />
-                    </div>
-                    <div className="mobile-field-group">
-                      <label className="mobile-field-label">الوصف</label>
-                      <textarea 
-                        value={editData.description} 
-                        onChange={e => setEditData({ ...editData, description: e.target.value })} 
-                        rows={2} 
-                        className="mobile-field" 
-                      />
-                    </div>
-                    <div className="mobile-field-group">
-                      <label className="mobile-field-label">التفاصيل</label>
-                      <textarea 
-                        value={editData.long_description} 
-                        onChange={e => setEditData({ ...editData, long_description: e.target.value })} 
-                        rows={3} 
-                        className="mobile-field" 
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="text-xl font-bold text-blue-400 mb-3">{selectedEvent.title}</h4>
-                        <div className="inline-flex items-center gap-2 mb-4">
-                          <span className={`mobile-status-badge ${selectedEvent.status === 'closed' ? 'mobile-status-neutral' : selectedEvent.status === 'postponed' ? 'mobile-status-warning' : 'mobile-status-success'}`}>
-                            {selectedEvent.status === 'closed' ? 'مغلقة' : selectedEvent.status === 'postponed' ? 'مؤجلة' : 'مفتوحة'}
-                          </span>
-                          {selectedEvent.status === 'postponed' && selectedEvent.postponed_to && (
-                            <span className="text-sm text-yellow-400">إلى {formatDate(selectedEvent.postponed_to)}</span>
-                          )}
-                        </div>
+                      <input
+                        value={editCaseData.title}
+                        onChange={e => setEditCaseData({ ...editCaseData, title: e.target.value })}
+                    />
+                  </div>
+                  <div className="mobile-field-group">
+                    <label className="mobile-field-label">المحكمة</label>
+                    <MobileAutocompleteInput
+                      value={editCaseData.court_name}
+                      onChange={v => setEditCaseData({ ...editCaseData, court_name: v })}
+                      placeholder="اسم المحكمة"
+                      fetcher={getCourtSuggestions}
+                      mruKey="mru:courts"
+                      icon="🏛️"
+                    />
+                  </div>
+                  <div className="mobile-field-group">
+                    <label className="mobile-field-label">المحامون</label>
+                    <MobileTokenInput
+                      tokens={editCaseData.lawyers}
+                      onTokensChange={t => setEditCaseData({ ...editCaseData, lawyers: t })}
+                      placeholder="أسماء المحامين"
+                      fetcher={getLawyerSuggestions}
+                      mruKey="mru:lawyers"
+                    />
+                  </div>
+                  <div className="mobile-field-group">
+                    <label className="mobile-field-label">المراجع</label>
+                    <MobileAutocompleteInput
+                      value={editCaseData.reviewer}
+                      onChange={v => setEditCaseData({ ...editCaseData, reviewer: v })}
+                      placeholder="اسم المراجع"
+                      fetcher={getReviewerSuggestions}
+                      mruKey="mru:reviewers"
+                      icon="👨‍💼"
+                    />
+                  </div>
+                  <div className="mobile-field-group">
+                    <label className="mobile-field-label">الوصف</label>
+                    <textarea
+                      value={editCaseData.description}
+                      onChange={e => setEditCaseData({ ...editCaseData, description: e.target.value })}
+                      rows={2}
+                      className="mobile-field"
+                    />
+                  </div>
+                  <div className="mobile-field-group">
+                    <label className="mobile-field-label">التفاصيل</label>
+                    <textarea
+                      value={editCaseData.long_description}
+                      onChange={e => setEditCaseData({ ...editCaseData, long_description: e.target.value })}
+                      rows={3}
+                      className="mobile-field"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="text-xl font-bold text-blue-400 mb-3">{selectedRow.title}</h4>
+                      <div className="inline-flex items-center gap-2 mb-4">
+                        <span
+                          className={`mobile-status-badge ${
+                            selectedRow.session_status === 'completed'
+                              ? 'mobile-status-neutral'
+                              : selectedRow.session_status === 'postponed'
+                              ? 'mobile-status-warning'
+                              : selectedRow.session_status === 'cancelled'
+                              ? 'mobile-status-danger'
+                              : 'mobile-status-success'
+                          }`}
+                        >
+                          {selectedRow.session_status === 'completed'
+                            ? 'مكتملة'
+                            : selectedRow.session_status === 'postponed'
+                            ? 'مؤجلة'
+                            : selectedRow.session_status === 'cancelled'
+                            ? 'ملغاة'
+                            : 'مجدولة'}
+                        </span>
+                        {selectedRow.session_status === 'postponed' && selectedRow.postponed_to && (
+                          <span className="text-sm text-yellow-400">إلى {formatDate(selectedRow.postponed_to)}</span>
+                        )}
                       </div>
-                      {authStatus.isLoggedIn && (
-                        <button onClick={() => setEditMode(true)} className="mobile-btn-icon mobile-btn-secondary">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                      )}
                     </div>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-500 min-w-[80px]">التاريخ:</span>
-                        <span>{formatDate(selectedEvent.date)}</span>
-                      </div>
-                      {!!selectedEvent.court_name && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-500 min-w-[80px]">المحكمة:</span>
-                          <span>{selectedEvent.court_name}</span>
-                        </div>
-                      )}
-                      {!!selectedEvent.reviewer && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-500 min-w-[80px]">المراجع:</span>
-                          <span>{selectedEvent.reviewer}</span>
-                        </div>
-                      )}
-                      {selectedEvent.lawyers && selectedEvent.lawyers.length > 0 && (
-                        <div>
-                          <span className="text-gray-500">المحامون:</span>
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {selectedEvent.lawyers.map((l, i) => (
-                              <span key={i} className="px-2 py-1 bg-dark-700/60 rounded-full text-xs border border-dark-600/50">{l}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {!!selectedEvent.description && (
-                        <div>
-                          <span className="text-gray-500">الوصف:</span>
-                          <p className="mt-1 text-gray-300">{selectedEvent.description}</p>
-                        </div>
-                      )}
-                      {!!selectedEvent.long_description && (
-                        <div>
-                          <span className="text-gray-500">التفاصيل:</span>
-                          <p className="mt-1 text-gray-300">{selectedEvent.long_description}</p>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                <div className="border-t border-dark-600/50 pt-6">
-                  <h5 className="font-semibold text-gray-300 mb-4">السجل الزمني</h5>
-                  <div className="space-y-3 max-h-48 overflow-y-auto mobile-scroll-smooth">
-                    {(logs[selectedEvent.case_ref] || []).map(log => (
-                      <div key={log.id} className="p-3 bg-dark-700/50 rounded-lg border border-dark-600/30">
-                        <div className="flex items-center gap-2 text-xs mb-2">
-                          <span className="text-gray-500">{formatDateTime(log.created_at)}</span>
-                          <span className={`mobile-status-badge mobile-status-${log.kind === 'create' ? 'success' : log.kind === 'update' ? 'info' : log.kind === 'postpone' ? 'warning' : log.kind === 'close' ? 'neutral' : log.kind === 'reopen' ? 'success' : log.kind === 'delete' ? 'danger' : 'info'}`}>
-                            {log.kind === 'create' ? 'إنشاء' : log.kind === 'update' ? 'تحديث' : log.kind === 'postpone' ? 'تأجيل' : log.kind === 'close' ? 'إغلاق' : log.kind === 'reopen' ? 'إعادة فتح' : log.kind === 'delete' ? 'حذف' : 'ملاحظة'}
-                          </span>
-                        </div>
-                        {log.message && <p className="text-sm text-gray-300">{log.message}</p>}
-                      </div>
-                    ))}
-                    {(!logs[selectedEvent.case_ref] || logs[selectedEvent.case_ref].length === 0) && (
-                      <div className="text-center py-4 text-gray-500 text-sm">لا يوجد سجل زمني</div>
+                    {authStatus.isLoggedIn && (
+                      <button
+                        onClick={() => setEditMode(true)}
+                        className="mobile-btn-icon mobile-btn-secondary"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          />
+                        </svg>
+                      </button>
                     )}
                   </div>
-                  {authStatus.isLoggedIn && (
-                    <div className="flex gap-2 mt-4">
-                      <input 
-                        value={noteText} 
-                        onChange={e => setNoteText(e.target.value)} 
-                        placeholder="أضف ملاحظة..." 
-                        className="mobile-field flex-1" 
-                        onKeyDown={e => e.key === 'Enter' && handleAddNote()} 
-                      />
-                      <button 
-                        onClick={handleAddNote} 
-                        disabled={!noteText.trim()} 
-                        className="mobile-btn mobile-btn-primary disabled:opacity-50"
-                      >
-                        إضافة
-                      </button>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-500 min-w-[80px]">التاريخ:</span>
+                      <span>{formatDate(selectedRow.session_date)}</span>
                     </div>
+                    {!!selectedRow.court_name && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500 min-w-[80px]">المحكمة:</span>
+                        <span>{selectedRow.court_name}</span>
+                      </div>
+                    )}
+                    {!!selectedRow.reviewer && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500 min-w-[80px]">المراجع:</span>
+                        <span>{selectedRow.reviewer}</span>
+                      </div>
+                    )}
+                    {selectedRow.lawyers && selectedRow.lawyers.length > 0 && (
+                      <div>
+                        <span className="text-gray-500">المحامون:</span>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {selectedRow.lawyers.map((l, i) => (
+                            <span
+                              key={i}
+                              className="px-2 py-1 bg-dark-700/60 rounded-full text-xs border border-dark-600/50"
+                            >
+                              {l}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              <div className="border-t border-dark-600/50 pt-6">
+                <h5 className="font-semibold text-gray-300 mb-4">السجل الزمني</h5>
+                <div className="space-y-3 max-h-48 overflow-y-auto mobile-scroll-smooth">
+                  {logs.map(log => (
+                    <div key={log.id} className="p-3 bg-dark-700/50 rounded-lg border border-dark-600/30">
+                      <div className="flex items-center justify-between gap-2 text-xs mb-2">
+                        <span className="text-gray-500">{formatDateTime(log.created_at as unknown as string)}</span>
+                        <span
+                          className={`mobile-status-badge ${
+                            log.action_type === 'case_created'
+                              ? 'mobile-status-success'
+                              : log.action_type === 'case_updated'
+                              ? 'mobile-status-info'
+                              : log.action_type === 'session_scheduled'
+                              ? 'mobile-status-success'
+                              : log.action_type === 'session_postponed'
+                              ? 'mobile-status-warning'
+                              : log.action_type === 'session_completed'
+                              ? 'mobile-status-neutral'
+                              : 'mobile-status-info'
+                          }`}
+                        >
+                          {log.action_type === 'case_created'
+                            ? 'إنشاء قضية'
+                            : log.action_type === 'case_updated'
+                            ? 'تحديث قضية'
+                            : log.action_type === 'session_scheduled'
+                            ? 'جدولة جلسة'
+                            : log.action_type === 'session_postponed'
+                            ? 'تأجيل جلسة'
+                            : log.action_type === 'session_completed'
+                            ? 'إكمال جلسة'
+                            : 'ملاحظة'}
+                        </span>
+                      </div>
+                      {log.description && <p className="text-sm text-gray-300">{log.description}</p>}
+                    </div>
+                  ))}
+                  {logs.length === 0 && (
+                    <div className="text-center py-4 text-gray-500 text-sm">لا يوجد سجل زمني</div>
                   )}
                 </div>
+
+                {authStatus.isLoggedIn && (
+                  <div className="flex gap-2 mt-4">
+                    <input
+                      value={noteText}
+                      onChange={e => setNoteText(e.target.value)}
+                      placeholder="أضف ملاحظة..."
+                      className="mobile-field flex-1"
+                      onKeyDown={e => e.key === 'Enter' && handleAddNote()}
+                    />
+                    <button
+                      onClick={handleAddNote}
+                      disabled={!noteText.trim()}
+                      className="mobile-btn mobile-btn-primary disabled:opacity-50"
+                    >
+                      إضافة
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
+
             <div className="mobile-modal-footer">
               {editMode && authStatus.isLoggedIn ? (
                 <div className="flex gap-2">
-                  <button onClick={handleUpdateEvent} className="mobile-btn mobile-btn-primary flex-1">حفظ التعديلات</button>
-                  <button onClick={() => setEditMode(false)} className="mobile-btn mobile-btn-secondary">إلغاء</button>
+                  <button onClick={handleUpdateCase} className="mobile-btn mobile-btn-primary flex-1">
+                    حفظ التعديلات
+                  </button>
+                  <button onClick={() => setEditMode(false)} className="mobile-btn mobile-btn-secondary">
+                    إلغاء
+                  </button>
                 </div>
-              ) : authStatus.isLoggedIn && (
+              ) : authStatus.isLoggedIn ? (
                 <div className="flex flex-wrap gap-2">
-                  {selectedEvent.status === 'open' && (
+                  {selectedRow.session_status !== 'completed' && selectedRow.session_status !== 'cancelled' && (
                     <>
-                      <button onClick={() => setPostponingEvent(selectedEvent)} className="mobile-btn mobile-btn-secondary flex-1">تأجيل</button>
-                      <button onClick={() => handleStatusChange(selectedEvent, 'closed')} className="mobile-btn mobile-btn-secondary flex-1">إغلاق</button>
+                      <button
+                        onClick={() => setPostponing(selectedRow)}
+                        className="mobile-btn mobile-btn-secondary"
+                      >
+                        تأجيل
+                      </button>
+                      <button
+                        onClick={() => handleComplete(selectedRow)}
+                        className="mobile-btn mobile-btn-secondary"
+                      >
+                        إنهاء
+                      </button>
                     </>
                   )}
-                  {selectedEvent.status === 'closed' && (
-                    <button onClick={() => handleStatusChange(selectedEvent, 'open')} className="mobile-btn mobile-btn-secondary flex-1">إعادة فتح</button>
-                  )}
-                  {selectedEvent.status === 'postponed' && (
-                    <div className="w-full text-center text-sm text-yellow-400 p-2 bg-yellow-500/10 rounded">
-                      هذه القضية مؤجلة إلى {formatDate(selectedEvent.postponed_to || '')}
-                    </div>
-                  )}
-                  <button onClick={() => handleDelete(selectedEvent)} className="mobile-btn mobile-btn-danger">حذف</button>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
       )}
 
-      {postponingEvent && (
-        <div className="mobile-modal-backdrop" onClick={() => setPostponingEvent(null)}>
+      {postponing && (
+        <div className="mobile-modal-backdrop" onClick={() => setPostponing(null)}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
             <div className="mobile-modal-header">
-              <h3 className="mobile-modal-title">تأجيل القضية</h3>
-              <button onClick={() => setPostponingEvent(null)} className="mobile-modal-close">
+              <h3 className="mobile-modal-title">تأجيل الجلسة</h3>
+              <button onClick={() => setPostponing(null)} className="mobile-modal-close">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -1131,31 +1048,36 @@ export default function MobileCalendar() {
             </div>
             <div className="mobile-modal-body">
               <div className="space-y-4">
-                <p className="text-gray-300">تأجيل: <strong className="text-blue-400">{postponingEvent.title}</strong></p>
-                <p className="text-sm text-gray-500">من تاريخ: {formatDate(postponingEvent.date)}</p>
+                <p className="text-gray-300">
+                  تأجيل: <strong className="text-blue-400">{postponing.title}</strong>
+                </p>
+                <p className="text-sm text-gray-500">من تاريخ: {formatDate(postponing.session_date)}</p>
                 <div className="mobile-field-group">
                   <label className="mobile-field-label">التاريخ الجديد</label>
-                  <input 
-                    type="date" 
-                    value={postponeDate} 
-                    onChange={e => setPostponeDate(e.target.value)} 
-                    min={format(new Date(), 'yyyy-MM-dd')} 
-                    className="mobile-field" 
+                  <input
+                    type="date"
+                    value={postponeDate}
+                    onChange={e => setPostponeDate(e.target.value)}
+                    min={format(new Date(), 'yyyy-MM-dd')}
+                    className="mobile-field"
                   />
                 </div>
               </div>
             </div>
             <div className="mobile-modal-footer">
               <div className="flex gap-3">
-                <button 
-                  onClick={handlePostpone} 
-                  disabled={!postponeDate} 
+                <button
+                  onClick={handlePostpone}
+                  disabled={!postponeDate}
                   className="mobile-btn mobile-btn-primary flex-1 disabled:opacity-50"
                 >
                   تأكيد التأجيل
                 </button>
-                <button 
-                  onClick={() => { setPostponingEvent(null); setPostponeDate('') }} 
+                <button
+                  onClick={() => {
+                    setPostponing(null)
+                    setPostponeDate('')
+                  }}
                   className="mobile-btn mobile-btn-secondary"
                 >
                   إلغاء
@@ -1166,10 +1088,10 @@ export default function MobileCalendar() {
         </div>
       )}
 
-      <LoginModal 
-        isOpen={showLoginModal} 
-        onClose={() => setShowLoginModal(false)} 
-        onLogin={() => setAuthStatus(getAuthStatus())} 
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLogin={() => setAuthStatus(getAuthStatus())}
       />
     </div>
   )
