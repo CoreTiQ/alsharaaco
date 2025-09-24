@@ -33,7 +33,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-content max-w-md" onClick={e => e.stopPropagation()}>
         <div className="p-6 border-b border-dark-700">
-          <h3 className="text-xl font-bold">تسجيل دخول المدير</h3>
+          <h3 className="text-xl font-bold">تسجيل مدخل البيانات</h3>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>

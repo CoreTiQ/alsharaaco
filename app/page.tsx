@@ -542,7 +542,7 @@ export default function Calendar() {
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         <header className="mb-4 sm:mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">رزنامة المكتب القانوني</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">شركة الشرع للمحاماة</h1>
             <div className="flex items-center gap-2 sm:gap-3">
               {authStatus.isLoggedIn ? (
                 <>
@@ -550,7 +550,7 @@ export default function Calendar() {
                   <button onClick={handleLogout} className="btn-danger">خروج</button>
                 </>
               ) : (
-                <button onClick={() => setShowLoginModal(true)} className="btn-primary">دخول المدير</button>
+                <button onClick={() => setShowLoginModal(true)} className="btn-primary">مدخل البيانات</button>
               )}
             </div>
           </div>
