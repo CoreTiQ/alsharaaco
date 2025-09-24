@@ -1,17 +1,6 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  format,
-  startOfMonth,
-  endOfMonth,
-  eachDayOfInterval,
-  isSameDay,
-  isToday,
-  addMonths,
-  subMonths,
-  startOfWeek,
-  endOfWeek,
-} from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns'
 import { ar } from 'date-fns/locale'
 import {
   supabase,
@@ -24,25 +13,13 @@ import {
   completeSession,
   updateCase,
   addNoteToLog,
+  CalendarRow
 } from '@/lib/supabaseClient'
 import { getAuthStatus, logout } from '@/lib/auth'
 import LoginModal from '@/components/LoginModal'
 import toast from 'react-hot-toast'
 
 type SuggestFetcher = (q: string) => Promise<string[]>
-
-type CalendarRow = {
-  session_id: string
-  session_date: string
-  session_status: 'scheduled' | 'completed' | 'postponed' | 'cancelled'
-  postponed_to: string | null
-  case_id: string
-  title: string
-  court_name: string | null
-  lawyers: string[] | null
-  reviewer: string | null
-  case_status: 'active' | 'completed' | 'cancelled'
-}
 
 function useDebouncedValue<T>(value: T, delay = 200) {
   const [v, setV] = useState(value)
@@ -181,15 +158,7 @@ function MobileAutocompleteInput(props: {
             </button>
           ))}
           {mru.length > 0 && (
-            <div
-              style={{
-                padding: '4px 12px',
-                fontSize: '0.6875rem',
-                color: '#94a3b8',
-                borderTop: '1px solid rgba(71, 85, 105, 0.3)',
-                textAlign: 'center',
-              }}
-            >
+            <div style={{ padding: '4px 12px', fontSize: '0.6875rem', color: '#94a3b8', borderTop: '1px solid rgba(71,85,105,.3)', textAlign: 'center' }}>
               الاقتراحات من الاستخدام السابق والقاعدة
             </div>
           )}
@@ -218,15 +187,11 @@ function MobileTokenInput(props: {
     let ignore = false
     const run = async () => {
       const base = await fetcher(debounced.trim())
-      const merged = mergeSuggestions(base, mru)
-        .filter(s => !tokens.includes(s))
-        .slice(0, 8)
+      const merged = mergeSuggestions(base, mru).filter(s => !tokens.includes(s)).slice(0, 8)
       if (!ignore) setItems(merged)
     }
     run()
-    return () => {
-      ignore = true
-    }
+    return () => { ignore = true }
   }, [debounced, fetcher, mru, tokens])
 
   useEffect(() => {
@@ -306,7 +271,7 @@ function MobileTokenInput(props: {
       )}
       {tokens.length > 0 && (
         <div style={{ marginTop: '4px', fontSize: '0.75rem', color: '#94a3b8' }}>
-          تم إضافة {tokens.length} محامٍ • اضغط Enter أو فاصلة لإضافة المزيد
+          تم إضافة {tokens.length} محامي • اضغط Enter أو فاصلة لإضافة المزيد
         </div>
       )}
     </div>
@@ -319,6 +284,7 @@ export default function Page() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [showDayModal, setShowDayModal] = useState(false)
   const [selectedRow, setSelectedRow] = useState<CalendarRow | null>(null)
+  const [selectedCase, setSelectedCase] = useState<Case | null>(null)
   const [logs, setLogs] = useState<ActivityLog[]>([])
   const [loading, setLoading] = useState(false)
   const [authStatus, setAuthStatus] = useState(getAuthStatus())
@@ -329,36 +295,22 @@ export default function Page() {
   const [noteText, setNoteText] = useState('')
   const [adding, setAdding] = useState(false)
 
-  const [newCase, setNewCase] = useState<{
-    title: string
-    court_name: string
-    lawyers: string[]
-    reviewer: string
-    description: string
-    long_description: string
-  }>({
+  const [newCase, setNewCase] = useState({
     title: '',
     court_name: '',
-    lawyers: [],
+    lawyers: [] as string[],
     reviewer: '',
     description: '',
-    long_description: '',
+    long_description: ''
   })
 
-  const [editCaseData, setEditCaseData] = useState<{
-    title: string
-    court_name: string
-    lawyers: string[]
-    reviewer: string
-    description: string
-    long_description: string
-  }>({
+  const [editCaseData, setEditCaseData] = useState({
     title: '',
     court_name: '',
-    lawyers: [],
+    lawyers: [] as string[],
     reviewer: '',
     description: '',
-    long_description: '',
+    long_description: ''
   })
 
   const monthStart = startOfMonth(currentMonth)
@@ -370,7 +322,6 @@ export default function Page() {
   useEffect(() => {
     loadMonth()
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMonth])
 
   const loadMonth = async () => {
@@ -381,7 +332,7 @@ export default function Page() {
         format(monthEnd, 'yyyy-MM-dd')
       )
       if (error) throw error
-      setRows((data || []) as any)
+      setRows((data || []) as CalendarRow[])
     } catch {
       toast.error('فشل تحميل البيانات')
     } finally {
@@ -398,33 +349,48 @@ export default function Page() {
   const openDay = (d: Date) => {
     setSelectedDate(d)
     setShowDayModal(true)
-    setNewCase({
-      title: '',
-      court_name: '',
-      lawyers: [],
-      reviewer: '',
-      description: '',
-      long_description: '',
-    })
+    setNewCase({ title: '', court_name: '', lawyers: [], reviewer: '', description: '', long_description: '' })
   }
 
   const openRowDetails = async (row: CalendarRow) => {
     setSelectedRow(row)
     setEditMode(false)
-    setEditCaseData({
-      title: row.title,
-      court_name: row.court_name || '',
-      lawyers: (row.lawyers || []) as string[],
-      reviewer: row.reviewer || '',
-      description: '',
-      long_description: '',
-    })
-    const { data } = await supabase
+
+    const { data: caseData } = await supabase
+      .from('cases')
+      .select('*')
+      .eq('id', row.case_id)
+      .single()
+
+    if (caseData) {
+      const c = caseData as Case
+      setSelectedCase(c)
+      setEditCaseData({
+        title: c.title || '',
+        court_name: c.court_name || '',
+        lawyers: (c.lawyers || []) as string[],
+        reviewer: c.reviewer || '',
+        description: c.description || '',
+        long_description: c.long_description || ''
+      })
+    } else {
+      setSelectedCase(null)
+      setEditCaseData({
+        title: row.title,
+        court_name: row.court_name || '',
+        lawyers: (row.lawyers || []) as string[],
+        reviewer: row.reviewer || '',
+        description: '',
+        long_description: ''
+      })
+    }
+
+    const { data: logsData } = await supabase
       .from('activity_logs')
       .select('*')
       .eq('case_id', row.case_id)
       .order('created_at', { ascending: true })
-    setLogs((data || []) as ActivityLog[])
+    setLogs((logsData || []) as ActivityLog[])
   }
 
   const handleCreate = async () => {
@@ -438,12 +404,12 @@ export default function Page() {
         reviewer: newCase.reviewer || null,
         description: newCase.description || null,
         long_description: newCase.long_description || null,
-        session_date: formatDateISO(selectedDate),
+        session_date: formatDateISO(selectedDate)
       })
 
-      if (caseRow.court_name?.trim()) pushMRU('mru:courts', caseRow.court_name.trim())
-      if (caseRow.reviewer?.trim()) pushMRU('mru:reviewers', caseRow.reviewer.trim())
-      ;(caseRow.lawyers || []).forEach((l: string) => l?.trim() && pushMRU('mru:lawyers', l.trim()))
+      if ((caseRow.court_name || '').trim()) pushMRU('mru:courts', (caseRow.court_name || '').trim())
+      if ((caseRow.reviewer || '').trim()) pushMRU('mru:reviewers', (caseRow.reviewer || '').trim())
+      ;(caseRow.lawyers || []).forEach(l => l && pushMRU('mru:lawyers', l.trim()))
 
       setNewCase({ title: '', court_name: '', lawyers: [], reviewer: '', description: '', long_description: '' })
       await loadMonth()
@@ -464,7 +430,7 @@ export default function Page() {
         lawyers: editCaseData.lawyers.length ? editCaseData.lawyers : null,
         reviewer: editCaseData.reviewer || null,
         description: editCaseData.description || null,
-        long_description: editCaseData.long_description || null,
+        long_description: editCaseData.long_description || null
       } as Partial<Case>)
       if (error) throw error
       if (data) {
@@ -473,12 +439,13 @@ export default function Page() {
           title: data.title,
           court_name: data.court_name,
           lawyers: data.lawyers,
-          reviewer: data.reviewer,
+          reviewer: data.reviewer
         } as CalendarRow)
+        setSelectedCase(data)
         await loadMonth()
-        if (data.court_name?.trim()) pushMRU('mru:courts', data.court_name.trim())
-        if (data.reviewer?.trim()) pushMRU('mru:reviewers', data.reviewer.trim())
-        ;(data.lawyers || []).forEach((l: string) => l?.trim() && pushMRU('mru:lawyers', l.trim()))
+        if ((data.court_name || '').trim()) pushMRU('mru:courts', (data.court_name || '').trim())
+        if ((data.reviewer || '').trim()) pushMRU('mru:reviewers', (data.reviewer || '').trim())
+        ;(data.lawyers || []).forEach(l => l && pushMRU('mru:lawyers', l.trim()))
       }
       setEditMode(false)
       toast.success('تم تحديث بيانات القضية')
@@ -490,17 +457,17 @@ export default function Page() {
   const handlePostpone = async () => {
     if (!postponing || !postponeDate || !authStatus.isLoggedIn) return
     try {
-      const sessionLike: CaseSession = {
+      const sess = {
         id: postponing.session_id,
         case_id: postponing.case_id,
-        session_date: postponing.session_date as any,
+        session_date: postponing.session_date,
         status: postponing.session_status,
-        postponed_to: postponing.postponed_to as any,
+        postponed_to: postponing.postponed_to,
         postpone_reason: null,
         notes: null,
-        created_at: '' as any,
-      }
-      const { error } = await postponeSession(sessionLike, postponeDate)
+        created_at: ''
+      } as CaseSession
+      const { error } = await postponeSession(sess, postponeDate, null)
       if (error) throw error
       await loadMonth()
       setPostponing(null)
@@ -603,17 +570,10 @@ export default function Page() {
           {authStatus.isLoggedIn ? (
             <>
               <span className="mobile-status-badge mobile-status-success">مدير النظام</span>
-              <button onClick={handleLogout} className="mobile-btn mobile-btn-danger mobile-btn-sm">
-                خروج
-              </button>
+              <button onClick={handleLogout} className="mobile-btn mobile-btn-danger mobile-btn-sm">خروج</button>
             </>
           ) : (
-            <button
-              onClick={() => setShowLoginModal(true)}
-              className="mobile-btn mobile-btn-primary mobile-btn-sm"
-            >
-              مدخل البيانات
-            </button>
+            <button onClick={() => setShowLoginModal(true)} className="mobile-btn mobile-btn-primary mobile-btn-sm">مدخل البيانات</button>
           )}
         </div>
       </header>
@@ -621,40 +581,24 @@ export default function Page() {
       <main className="mobile-main mobile-safe-left mobile-safe-right mobile-scroll-smooth">
         <div className="mobile-calendar">
           <div className="mobile-calendar-nav">
-            <button
-              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-              className="mobile-calendar-nav-btn"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-              </svg>
+            <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="mobile-calendar-nav-btn">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
             </button>
-            <h2 className="mobile-calendar-title">
-              {format(currentMonth, 'MMMM yyyy', { locale: ar })}
-            </h2>
-            <button
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              className="mobile-calendar-nav-btn"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-              </svg>
+            <h2 className="mobile-calendar-title">{format(currentMonth, 'MMMM yyyy', { locale: ar })}</h2>
+            <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="mobile-calendar-nav-btn">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
             </button>
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="mobile-loader" />
-            </div>
+            <div className="flex items-center justify-center py-20"><div className="mobile-loader" /></div>
           ) : (
             <div className="mobile-calendar-content">
               <div className="mobile-calendar-grid-container">
                 <div className="mobile-calendar-grid">
                   <div className="mobile-calendar-header">
                     {['سبت', 'أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة'].map(day => (
-                      <div key={day} className="mobile-calendar-day-header">
-                        {day}
-                      </div>
+                      <div key={day} className="mobile-calendar-day-header">{day}</div>
                     ))}
                   </div>
                   {calendarDays.map(day => {
@@ -664,9 +608,7 @@ export default function Page() {
                       <button
                         key={day.toISOString()}
                         onClick={() => openDay(day)}
-                        className={`mobile-calendar-day ${!inMonth ? 'other-month' : ''} ${
-                          isToday(day) ? 'today' : ''
-                        } ${items.length > 0 ? 'has-events' : ''}`}
+                        className={`mobile-calendar-day ${!inMonth ? 'other-month' : ''} ${isToday(day) ? 'today' : ''} ${items.length > 0 ? 'has-events' : ''}`}
                       >
                         <div className="mobile-calendar-day-number">{format(day, 'd')}</div>
                         {items.length > 0 && (
@@ -683,133 +625,62 @@ export default function Page() {
       </main>
 
       {showDayModal && selectedDate && (
-        <div
-          className="mobile-modal-backdrop"
-          onClick={() => {
-            setShowDayModal(false)
-            setSelectedDate(null)
-          }}
-        >
+        <div className="mobile-modal-backdrop" onClick={() => { setShowDayModal(false); setSelectedDate(null) }}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
             <div className="mobile-modal-header">
               <h3 className="mobile-modal-title">جلسات يوم {formatDate(selectedDate)}</h3>
-              <button
-                onClick={() => {
-                  setShowDayModal(false)
-                  setSelectedDate(null)
-                }}
-                className="mobile-modal-close"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button onClick={() => { setShowDayModal(false); setSelectedDate(null) }} className="mobile-modal-close">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
             <div className="mobile-modal-body">
               <div className="space-y-6">
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-200 mb-4">
-                    الجلسات المسجلة ({dayRows(selectedDate).length})
-                  </h4>
+                  <h4 className="text-lg font-semibold text-gray-200 mb-4">الجلسات المسجلة ({dayRows(selectedDate).length})</h4>
                   <div className="space-y-3">
                     {dayRows(selectedDate).length === 0 && (
                       <div className="text-center py-8 text-gray-500">
-                        <svg
-                          className="w-16 h-16 mx-auto mb-4 opacity-50"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1.5}
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                          />
-                        </svg>
+                        <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         <p className="text-lg">لا توجد جلسات في هذا اليوم</p>
                       </div>
                     )}
                     {dayRows(selectedDate).map(r => (
-                      <div
-                        key={r.session_id}
-                        className="p-4 bg-dark-700/60 rounded-xl border border-dark-600/50 backdrop-blur-sm"
-                      >
+                      <div key={r.session_id} className="p-4 bg-dark-700/60 rounded-xl border border-dark-600/50 backdrop-blur-sm">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-2">
-                              <span
-                                className={`mobile-status-badge ${
-                                  r.session_status === 'completed'
-                                    ? 'mobile-status-neutral'
-                                    : r.session_status === 'postponed'
-                                    ? 'mobile-status-warning'
-                                    : r.session_status === 'cancelled'
-                                    ? 'mobile-status-danger'
-                                    : 'mobile-status-success'
-                                }`}
-                              >
-                                {r.session_status === 'completed'
-                                  ? 'مكتملة'
-                                  : r.session_status === 'postponed'
-                                  ? 'مؤجلة'
-                                  : r.session_status === 'cancelled'
-                                  ? 'ملغاة'
-                                  : 'مجدولة'}
+                              <span className={`mobile-status-badge ${
+                                r.session_status === 'completed' ? 'mobile-status-neutral' :
+                                r.session_status === 'postponed' ? 'mobile-status-warning' :
+                                r.session_status === 'cancelled' ? 'mobile-status-danger' : 'mobile-status-success'
+                              }`}>
+                                {r.session_status === 'completed' ? 'مكتملة' : r.session_status === 'postponed' ? 'مؤجلة' : r.session_status === 'cancelled' ? 'ملغاة' : 'مجدولة'}
                               </span>
                             </div>
                             <h5 className="font-semibold text-blue-400 mb-2 text-lg">{r.title}</h5>
-                            {r.court_name && (
-                              <p className="text-sm text-gray-400 mb-1">المحكمة: {r.court_name}</p>
-                            )}
-                            {r.reviewer && (
-                              <p className="text-sm text-gray-400 mb-1">المراجع: {r.reviewer}</p>
-                            )}
+                            {r.court_name && <p className="text-sm text-gray-400 mb-1">المحكمة: {r.court_name}</p>}
+                            {r.reviewer && <p className="text-sm text-gray-400 mb-1">المراجع: {r.reviewer}</p>}
                             {r.lawyers && r.lawyers.length > 0 && (
                               <div className="flex flex-wrap gap-1 mb-2">
                                 {r.lawyers.map((l, i) => (
-                                  <span
-                                    key={i}
-                                    className="px-2 py-1 bg-dark-800/60 rounded-full text-xs border border-dark-600/50"
-                                  >
-                                    {l}
-                                  </span>
+                                  <span key={i} className="px-2 py-1 bg-dark-800/60 rounded-full text-xs border border-dark-600/50">{l}</span>
                                 ))}
                               </div>
                             )}
                             {r.session_status === 'postponed' && r.postponed_to && (
-                              <p className="text-sm text-yellow-400 mt-2">
-                                مؤجلة إلى {formatDate(r.postponed_to)}
-                              </p>
+                              <p className="text-sm text-yellow-400 mt-2">مؤجلة إلى {formatDate(r.postponed_to)}</p>
                             )}
                           </div>
                         </div>
                         <div className="flex gap-2 mt-3 pt-3 border-t border-dark-600/30">
-                          <button
-                            onClick={() => openRowDetails(r)}
-                            className="mobile-btn mobile-btn-secondary mobile-btn-sm flex-1"
-                          >
-                            تفاصيل
-                          </button>
-                          {authStatus.isLoggedIn &&
-                            r.session_status !== 'completed' &&
-                            r.session_status !== 'cancelled' && (
-                              <>
-                                <button
-                                  onClick={() => setPostponing(r)}
-                                  className="mobile-btn mobile-btn-secondary mobile-btn-sm"
-                                >
-                                  تأجيل
-                                </button>
-                                <button
-                                  onClick={() => handleComplete(r)}
-                                  className="mobile-btn mobile-btn-secondary mobile-btn-sm"
-                                >
-                                  إنهاء
-                                </button>
-                              </>
-                            )}
+                          <button onClick={() => openRowDetails(r)} className="mobile-btn mobile-btn-secondary mobile-btn-sm flex-1">تفاصيل</button>
+                          {authStatus.isLoggedIn && r.session_status !== 'completed' && r.session_status !== 'cancelled' && (
+                            <>
+                              <button onClick={() => setPostponing(r)} className="mobile-btn mobile-btn-secondary mobile-btn-sm">تأجيل</button>
+                              <button onClick={() => handleComplete(r)} className="mobile-btn mobile-btn-secondary mobile-btn-sm">إنهاء</button>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -818,9 +689,7 @@ export default function Page() {
 
                 {authStatus.isLoggedIn && (
                   <div className="border-t border-dark-600/50 pt-6">
-                    <h4 className="text-lg font-semibold text-gray-200 mb-4">
-                      إضافة قضية + جلسة
-                    </h4>
+                    <h4 className="text-lg font-semibold text-gray-200 mb-4">إضافة قضية + جلسة</h4>
                     <div className="space-y-4">
                       <div className="mobile-field-group">
                         <label className="mobile-field-label">عنوان القضية *</label>
@@ -877,9 +746,7 @@ export default function Page() {
                         <label className="mobile-field-label">تفاصيل إضافية</label>
                         <textarea
                           value={newCase.long_description}
-                          onChange={e =>
-                            setNewCase({ ...newCase, long_description: e.target.value })
-                          }
+                          onChange={e => setNewCase({ ...newCase, long_description: e.target.value })}
                           placeholder="تفاصيل إضافية أو ملاحظات"
                           rows={4}
                           className="mobile-field"
@@ -907,14 +774,12 @@ export default function Page() {
       )}
 
       {selectedRow && (
-        <div className="mobile-modal-backdrop" onClick={() => setSelectedRow(null)}>
+        <div className="mobile-modal-backdrop" onClick={() => { setSelectedRow(null); setSelectedCase(null) }}>
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
             <div className="mobile-modal-header">
               <h3 className="mobile-modal-title">تفاصيل القضية</h3>
-              <button onClick={() => setSelectedRow(null)} className="mobile-modal-close">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button onClick={() => { setSelectedRow(null); setSelectedCase(null) }} className="mobile-modal-close">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
@@ -966,9 +831,7 @@ export default function Page() {
                       <label className="mobile-field-label">الوصف</label>
                       <textarea
                         value={editCaseData.description}
-                        onChange={e =>
-                          setEditCaseData({ ...editCaseData, description: e.target.value })
-                        }
+                        onChange={e => setEditCaseData({ ...editCaseData, description: e.target.value })}
                         rows={2}
                         className="mobile-field"
                       />
@@ -977,9 +840,7 @@ export default function Page() {
                       <label className="mobile-field-label">التفاصيل</label>
                       <textarea
                         value={editCaseData.long_description}
-                        onChange={e =>
-                          setEditCaseData({ ...editCaseData, long_description: e.target.value })
-                        }
+                        onChange={e => setEditCaseData({ ...editCaseData, long_description: e.target.value })}
                         rows={3}
                         className="mobile-field"
                       />
@@ -989,81 +850,63 @@ export default function Page() {
                   <>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h4 className="text-xl font-bold text-blue-400 mb-3">{selectedRow.title}</h4>
+                        <h4 className="text-xl font-bold text-blue-400 mb-3">{selectedCase?.title || selectedRow.title}</h4>
                         <div className="inline-flex items-center gap-2 mb-4">
-                          <span
-                            className={`mobile-status-badge ${
-                              selectedRow.session_status === 'completed'
-                                ? 'mobile-status-neutral'
-                                : selectedRow.session_status === 'postponed'
-                                ? 'mobile-status-warning'
-                                : selectedRow.session_status === 'cancelled'
-                                ? 'mobile-status-danger'
-                                : 'mobile-status-success'
-                            }`}
-                          >
-                            {selectedRow.session_status === 'completed'
-                              ? 'مكتملة'
-                              : selectedRow.session_status === 'postponed'
-                              ? 'مؤجلة'
-                              : selectedRow.session_status === 'cancelled'
-                              ? 'ملغاة'
-                              : 'مجدولة'}
+                          <span className={`mobile-status-badge ${
+                            selectedRow.session_status === 'completed' ? 'mobile-status-neutral' :
+                            selectedRow.session_status === 'postponed' ? 'mobile-status-warning' :
+                            selectedRow.session_status === 'cancelled' ? 'mobile-status-danger' : 'mobile-status-success'
+                          }`}>
+                            {selectedRow.session_status === 'completed' ? 'مكتملة' : selectedRow.session_status === 'postponed' ? 'مؤجلة' : selectedRow.session_status === 'cancelled' ? 'ملغاة' : 'مجدولة'}
                           </span>
                           {selectedRow.session_status === 'postponed' && selectedRow.postponed_to && (
-                            <span className="text-sm text-yellow-400">
-                              إلى {formatDate(selectedRow.postponed_to)}
-                            </span>
+                            <span className="text-sm text-yellow-400">إلى {formatDate(selectedRow.postponed_to)}</span>
                           )}
                         </div>
                       </div>
                       {authStatus.isLoggedIn && (
-                        <button
-                          onClick={() => setEditMode(true)}
-                          className="mobile-btn-icon mobile-btn-secondary"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            />
-                          </svg>
+                        <button onClick={() => setEditMode(true)} className="mobile-btn-icon mobile-btn-secondary">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                         </button>
                       )}
                     </div>
-
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         <span className="text-gray-500 min-w-[80px]">التاريخ:</span>
                         <span>{formatDate(selectedRow.session_date)}</span>
                       </div>
-                      {!!selectedRow.court_name && (
+                      {!!(selectedCase?.court_name || selectedRow.court_name) && (
                         <div className="flex items-center gap-2">
                           <span className="text-gray-500 min-w-[80px]">المحكمة:</span>
-                          <span>{selectedRow.court_name}</span>
+                          <span>{selectedCase?.court_name || selectedRow.court_name}</span>
                         </div>
                       )}
-                      {!!selectedRow.reviewer && (
+                      {!!(selectedCase?.reviewer || selectedRow.reviewer) && (
                         <div className="flex items-center gap-2">
                           <span className="text-gray-500 min-w-[80px]">المراجع:</span>
-                          <span>{selectedRow.reviewer}</span>
+                          <span>{selectedCase?.reviewer || selectedRow.reviewer}</span>
                         </div>
                       )}
-                      {selectedRow.lawyers && selectedRow.lawyers.length > 0 && (
+                      {(selectedCase?.lawyers || selectedRow.lawyers)?.length ? (
                         <div>
                           <span className="text-gray-500">المحامون:</span>
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {selectedRow.lawyers.map((l, i) => (
-                              <span
-                                key={i}
-                                className="px-2 py-1 bg-dark-700/60 rounded-full text-xs border border-dark-600/50"
-                              >
-                                {l}
-                              </span>
+                            {(selectedCase?.lawyers || selectedRow.lawyers || []).map((l, i) => (
+                              <span key={i} className="px-2 py-1 bg-dark-700/60 rounded-full text-xs border border-dark-600/50">{l}</span>
                             ))}
                           </div>
+                        </div>
+                      ) : null}
+                      {!!selectedCase?.description && (
+                        <div>
+                          <span className="text-gray-500">الوصف:</span>
+                          <p className="mt-1 text-gray-300">{selectedCase.description}</p>
+                        </div>
+                      )}
+                      {!!selectedCase?.long_description && (
+                        <div>
+                          <span className="text-gray-500">التفاصيل:</span>
+                          <p className="mt-1 text-gray-300 whitespace-pre-wrap">{selectedCase.long_description}</p>
                         </div>
                       )}
                     </div>
@@ -1073,48 +916,35 @@ export default function Page() {
                 <div className="border-t border-dark-600/50 pt-6">
                   <h5 className="font-semibold text-gray-300 mb-4">السجل الزمني</h5>
                   <div className="space-y-3 max-h-48 overflow-y-auto mobile-scroll-smooth">
-                    {logs.map(log => (
+                    {(logs || []).map(log => (
                       <div key={log.id} className="p-3 bg-dark-700/50 rounded-lg border border-dark-600/30">
-                        <div className="flex items-center justify-between gap-2 text-xs mb-2">
-                          <span className="text-gray-500">
-                            {formatDateTime((log.created_at as unknown as string) || '')}
-                          </span>
-                          <span
-                            className={`mobile-status-badge ${
-                              log.action_type === 'case_created'
-                                ? 'mobile-status-success'
-                                : log.action_type === 'case_updated'
-                                ? 'mobile-status-info'
-                                : log.action_type === 'session_scheduled'
-                                ? 'mobile-status-success'
-                                : log.action_type === 'session_postponed'
-                                ? 'mobile-status-warning'
-                                : log.action_type === 'session_completed'
-                                ? 'mobile-status-neutral'
-                                : 'mobile-status-info'
-                            }`}
-                          >
-                            {log.action_type === 'case_created'
-                              ? 'إنشاء قضية'
-                              : log.action_type === 'case_updated'
-                              ? 'تحديث قضية'
-                              : log.action_type === 'session_scheduled'
-                              ? 'جدولة جلسة'
-                              : log.action_type === 'session_postponed'
-                              ? 'تأجيل جلسة'
-                              : log.action_type === 'session_completed'
-                              ? 'إكمال جلسة'
+                        <div className="flex items-center gap-2 text-xs mb-2">
+                          <span className="text-gray-500">{formatDateTime(log.created_at)}</span>
+                          <span className={`mobile-status-badge ${
+                            log.action_type === 'case_created' ? 'mobile-status-success' :
+                            log.action_type === 'case_updated' ? 'mobile-status-info' :
+                            log.action_type === 'session_scheduled' ? 'mobile-status-info' :
+                            log.action_type === 'session_postponed' ? 'mobile-status-warning' :
+                            log.action_type === 'session_completed' ? 'mobile-status-neutral' :
+                            log.action_type === 'session_cancelled' ? 'mobile-status-danger' :
+                            log.action_type === 'note_added' ? 'mobile-status-info' : 'mobile-status-info'
+                          }`}>
+                            {log.action_type === 'case_created' ? 'إنشاء قضية'
+                              : log.action_type === 'case_updated' ? 'تحديث قضية'
+                              : log.action_type === 'session_scheduled' ? 'جدولة جلسة'
+                              : log.action_type === 'session_postponed' ? 'تأجيل جلسة'
+                              : log.action_type === 'session_completed' ? 'إنهاء جلسة'
+                              : log.action_type === 'session_cancelled' ? 'إلغاء جلسة'
                               : 'ملاحظة'}
                           </span>
                         </div>
-                        {log.description && <p className="text-sm text-gray-300">{log.description}</p>}
+                        <p className="text-sm text-gray-300">{log.description}</p>
                       </div>
                     ))}
-                    {logs.length === 0 && (
+                    {(!logs || logs.length === 0) && (
                       <div className="text-center py-4 text-gray-500 text-sm">لا يوجد سجل زمني</div>
                     )}
                   </div>
-
                   {authStatus.isLoggedIn && (
                     <div className="flex gap-2 mt-4">
                       <input
@@ -1140,34 +970,19 @@ export default function Page() {
             <div className="mobile-modal-footer">
               {editMode && authStatus.isLoggedIn ? (
                 <div className="flex gap-2">
-                  <button onClick={handleUpdateCase} className="mobile-btn mobile-btn-primary flex-1">
-                    حفظ التعديلات
-                  </button>
-                  <button onClick={() => setEditMode(false)} className="mobile-btn mobile-btn-secondary">
-                    إلغاء
-                  </button>
+                  <button onClick={handleUpdateCase} className="mobile-btn mobile-btn-primary flex-1">حفظ التعديلات</button>
+                  <button onClick={() => setEditMode(false)} className="mobile-btn mobile-btn-secondary">إلغاء</button>
                 </div>
-              ) : authStatus.isLoggedIn ? (
+              ) : authStatus.isLoggedIn && (
                 <div className="flex flex-wrap gap-2">
-                  {selectedRow.session_status !== 'completed' &&
-                    selectedRow.session_status !== 'cancelled' && (
-                      <>
-                        <button
-                          onClick={() => setPostponing(selectedRow)}
-                          className="mobile-btn mobile-btn-secondary"
-                        >
-                          تأجيل
-                        </button>
-                        <button
-                          onClick={() => handleComplete(selectedRow)}
-                          className="mobile-btn mobile-btn-secondary"
-                        >
-                          إنهاء
-                        </button>
-                      </>
-                    )}
+                  {selectedRow.session_status !== 'completed' && selectedRow.session_status !== 'cancelled' && (
+                    <>
+                      <button onClick={() => setPostponing(selectedRow)} className="mobile-btn mobile-btn-secondary flex-1">تأجيل</button>
+                      <button onClick={() => handleComplete(selectedRow)} className="mobile-btn mobile-btn-secondary flex-1">إنهاء</button>
+                    </>
+                  )}
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
         </div>
@@ -1179,16 +994,12 @@ export default function Page() {
             <div className="mobile-modal-header">
               <h3 className="mobile-modal-title">تأجيل الجلسة</h3>
               <button onClick={() => setPostponing(null)} className="mobile-modal-close">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="mobile-modal-body">
               <div className="space-y-4">
-                <p className="text-gray-300">
-                  تأجيل: <strong className="text-blue-400">{postponing.title}</strong>
-                </p>
+                <p className="text-gray-300">تأجيل: <strong className="text-blue-400">{postponing.title}</strong></p>
                 <p className="text-sm text-gray-500">من تاريخ: {formatDate(postponing.session_date)}</p>
                 <div className="mobile-field-group">
                   <label className="mobile-field-label">التاريخ الجديد</label>
@@ -1212,10 +1023,7 @@ export default function Page() {
                   تأكيد التأجيل
                 </button>
                 <button
-                  onClick={() => {
-                    setPostponing(null)
-                    setPostponeDate('')
-                  }}
+                  onClick={() => { setPostponing(null); setPostponeDate('') }}
                   className="mobile-btn mobile-btn-secondary"
                 >
                   إلغاء
