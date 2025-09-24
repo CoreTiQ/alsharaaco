@@ -1,10 +1,11 @@
-// lib/supabaseClient.ts
-import { createClient } from '@supabase/supabase-js'
+import { createClient, PostgrestError } from '@supabase/supabase-js'
 
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: { persistSession: false }
+})
 
 export type Case = {
   id: string
@@ -35,95 +36,165 @@ export type ActivityLog = {
   case_id: string | null
   session_id: string | null
   action_type:
-    | 'case_created' | 'case_updated' | 'case_completed' | 'case_cancelled'
-    | 'session_scheduled' | 'session_postponed' | 'session_completed' | 'session_cancelled'
+    | 'case_created'
+    | 'case_updated'
+    | 'case_completed'
+    | 'case_cancelled'
+    | 'session_scheduled'
+    | 'session_postponed'
+    | 'session_completed'
+    | 'session_cancelled'
     | 'note_added'
   description: string
-  details: any
+  details: any | null
   created_at: string
   created_by: string | null
 }
 
-// عمليات مريحة
-export async function fetchMonthSessions(isoStart: string, isoEnd: string) {
-  return supabase
+export type CalendarRow = {
+  session_id: string
+  session_date: string
+  session_status: 'scheduled' | 'completed' | 'postponed' | 'cancelled'
+  postponed_to: string | null
+  case_id: string
+  title: string
+  court_name: string | null
+  lawyers: string[] | null
+  reviewer: string | null
+  case_status: 'active' | 'completed' | 'cancelled'
+}
+
+export async function fetchMonthSessions(
+  fromISO: string,
+  toISO: string
+): Promise<{ data: CalendarRow[] | null; error: PostgrestError | null }> {
+  const { data, error } = await supabase
     .from('v_calendar_sessions')
     .select('*')
-    .gte('session_date', isoStart)
-    .lte('session_date', isoEnd)
+    .gte('session_date', fromISO)
+    .lte('session_date', toISO)
     .order('session_date', { ascending: true })
+
+  return { data: (data as CalendarRow[]) || null, error }
 }
 
 export async function createCaseAndSession(input: {
   title: string
-  court_name?: string | null
-  lawyers?: string[] | null
-  reviewer?: string | null
-  description?: string | null
-  long_description?: string | null
+  court_name: string | null
+  lawyers: string[] | null
+  reviewer: string | null
+  description: string | null
+  long_description: string | null
   session_date: string
-}) {
-  const { data: caseRow, error: caseErr } = await supabase
+}): Promise<{
+  caseRow: Case
+  sessionRow: CaseSession
+}> {
+  const { data: caseInserted, error: caseErr } = await supabase
     .from('cases')
-    .insert([{
-      title: input.title,
-      court_name: input.court_name ?? null,
-      lawyers: input.lawyers ?? null,
-      reviewer: input.reviewer ?? null,
-      description: input.description ?? null,
-      long_description: input.long_description ?? null,
-      status: 'active'
-    }])
+    .insert([
+      {
+        title: input.title,
+        court_name: input.court_name,
+        lawyers: input.lawyers,
+        reviewer: input.reviewer,
+        description: input.description,
+        long_description: input.long_description,
+        status: 'active'
+      }
+    ])
     .select()
     .single()
-  if (caseErr) throw caseErr
 
-  const { data: sessionRow, error: sessErr } = await supabase
+  if (caseErr || !caseInserted) {
+    throw caseErr || new Error('failed to insert case')
+  }
+
+  const { data: sessionInserted, error: sessErr } = await supabase
     .from('case_sessions')
-    .insert([{
-      case_id: caseRow.id,
-      session_date: input.session_date,
-      status: 'scheduled'
-    }])
+    .insert([
+      {
+        case_id: caseInserted.id,
+        session_date: input.session_date,
+        status: 'scheduled'
+      }
+    ])
     .select()
     .single()
-  if (sessErr) throw sessErr
 
-  return { caseRow, sessionRow }
+  if (sessErr || !sessionInserted) {
+    throw sessErr || new Error('failed to insert session')
+  }
+
+  return { caseRow: caseInserted as Case, sessionRow: sessionInserted as CaseSession }
 }
 
-export async function postponeSession(session: CaseSession, toDateISO: string, reason?: string) {
+export async function updateCase(
+  id: string,
+  patch: Partial<Case>
+): Promise<{ data: Case | null; error: PostgrestError | null }> {
   const { data, error } = await supabase
-    .from('case_sessions')
-    .update({ status: 'postponed', postponed_to: toDateISO, postpone_reason: reason ?? null })
-    .eq('id', session.id)
+    .from('cases')
+    .update({
+      title: patch.title,
+      court_name: patch.court_name ?? null,
+      lawyers: patch.lawyers ?? null,
+      reviewer: patch.reviewer ?? null,
+      description: patch.description ?? null,
+      long_description: patch.long_description ?? null,
+      status: patch.status
+    })
+    .eq('id', id)
     .select()
     .single()
-  return { data, error }
+
+  return { data: (data as Case) || null, error }
 }
 
-export async function completeSession(sessionId: string) {
-  return supabase
+export async function postponeSession(
+  session: CaseSession,
+  newDateISO: string,
+  reason: string | null = null
+): Promise<{ error: PostgrestError | null }> {
+  const { error } = await supabase
+    .from('case_sessions')
+    .update({
+      status: 'postponed',
+      postponed_to: newDateISO,
+      postpone_reason: reason ?? session.postpone_reason ?? null
+    })
+    .eq('id', session.id)
+
+  return { error }
+}
+
+export async function completeSession(sessionId: string): Promise<{ error: PostgrestError | null }> {
+  const { error } = await supabase
     .from('case_sessions')
     .update({ status: 'completed' })
     .eq('id', sessionId)
-    .select()
-    .single()
+
+  return { error }
 }
 
-export async function updateCase(caseId: string, patch: Partial<Case>) {
-  return supabase
-    .from('cases')
-    .update(patch)
-    .eq('id', caseId)
-    .select()
-    .single()
-}
-
-export async function addNoteToLog(caseId: string, sessionId: string | null, msg: string) {
-  return supabase
+export async function addNoteToLog(
+  case_id: string,
+  session_id: string | null,
+  message: string
+): Promise<{ data: ActivityLog | null; error: PostgrestError | null }> {
+  const { data, error } = await supabase
     .from('activity_logs')
-    .insert([{ case_id: caseId, session_id: sessionId, action_type: 'note_added', description: msg }])
+    .insert([
+      {
+        case_id,
+        session_id,
+        action_type: 'note_added',
+        description: message,
+        details: null
+      }
+    ])
     .select()
     .single()
+
+  return { data: (data as ActivityLog) || null, error }
 }
