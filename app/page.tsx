@@ -11,15 +11,27 @@ import {
   createCaseAndSession,
   postponeSession,
   completeSession,
-  updateCase,
-  addNoteToLog,
-  CalendarRow
+  updateCase as updateCaseApi,
+  addNoteToLog
 } from '@/lib/supabaseClient'
 import { getAuthStatus, logout } from '@/lib/auth'
 import LoginModal from '@/components/LoginModal'
 import toast from 'react-hot-toast'
 
 type SuggestFetcher = (q: string) => Promise<string[]>
+
+type CalendarRow = {
+  session_id: string
+  session_date: string
+  session_status: 'scheduled' | 'completed' | 'postponed' | 'cancelled'
+  postponed_to: string | null
+  case_id: string
+  title: string
+  court_name: string | null
+  lawyers: string[] | null
+  reviewer: string | null
+  case_status: 'active' | 'completed' | 'cancelled'
+}
 
 function useDebouncedValue<T>(value: T, delay = 200) {
   const [v, setV] = useState(value)
@@ -111,7 +123,9 @@ function MobileAutocompleteInput(props: {
       if (!ignore) setItems(merged)
     }
     run()
-    return () => { ignore = true }
+    return () => {
+      ignore = true
+    }
   }, [debounced, fetcher, mru])
 
   useEffect(() => {
@@ -156,7 +170,13 @@ function MobileAutocompleteInput(props: {
             </button>
           ))}
           {mru.length > 0 && (
-            <div style={{ padding: '4px 12px', fontSize: '0.6875rem', color: '#94a3b8', borderTop: '1px solid rgba(71,85,105,.3)', textAlign: 'center' }}>
+            <div style={{
+              padding: '4px 12px',
+              fontSize: '0.6875rem',
+              color: '#94a3b8',
+              borderTop: '1px solid rgba(71, 85, 105, 0.3)',
+              textAlign: 'center'
+            }}>
               الاقتراحات من الاستخدام السابق والقاعدة
             </div>
           )}
@@ -282,8 +302,10 @@ export default function Page() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [showDayModal, setShowDayModal] = useState(false)
   const [selectedRow, setSelectedRow] = useState<CalendarRow | null>(null)
+
   const [selectedCase, setSelectedCase] = useState<Case | null>(null)
   const [logs, setLogs] = useState<ActivityLog[]>([])
+
   const [loading, setLoading] = useState(false)
   const [authStatus, setAuthStatus] = useState(getAuthStatus())
   const [showLoginModal, setShowLoginModal] = useState(false)
@@ -293,19 +315,33 @@ export default function Page() {
   const [noteText, setNoteText] = useState('')
   const [adding, setAdding] = useState(false)
 
-  const [newCase, setNewCase] = useState({
+  const [newCase, setNewCase] = useState<{
+    title: string
+    court_name: string
+    lawyers: string[]
+    reviewer: string
+    description: string
+    long_description: string
+  }>({
     title: '',
     court_name: '',
-    lawyers: [] as string[],
+    lawyers: [],
     reviewer: '',
     description: '',
     long_description: ''
   })
 
-  const [editCaseData, setEditCaseData] = useState({
+  const [editCaseData, setEditCaseData] = useState<{
+    title: string
+    court_name: string
+    lawyers: string[]
+    reviewer: string
+    description: string
+    long_description: string
+  }>({
     title: '',
     court_name: '',
-    lawyers: [] as string[],
+    lawyers: [],
     reviewer: '',
     description: '',
     long_description: ''
@@ -330,7 +366,7 @@ export default function Page() {
         format(monthEnd, 'yyyy-MM-dd')
       )
       if (error) throw error
-      setRows((data || []) as CalendarRow[])
+      setRows((data || []) as any)
     } catch {
       toast.error('فشل تحميل البيانات')
     } finally {
@@ -347,52 +383,45 @@ export default function Page() {
   const openDay = (d: Date) => {
     setSelectedDate(d)
     setShowDayModal(true)
-    setNewCase({ title: '', court_name: '', lawyers: [], reviewer: '', description: '', long_description: '' })
+    setNewCase({
+      title: '',
+      court_name: '',
+      lawyers: [],
+      reviewer: '',
+      description: '',
+      long_description: ''
+    })
   }
 
   const openRowDetails = async (row: CalendarRow) => {
     setSelectedRow(row)
     setEditMode(false)
-
-    const { data: caseData } = await supabase
+    const { data: c } = await supabase
       .from('cases')
       .select('*')
       .eq('id', row.case_id)
-      .single()
-
-    if (caseData) {
-      const c = caseData as Case
-      setSelectedCase(c)
-      setEditCaseData({
-        title: c.title || '',
-        court_name: c.court_name || '',
-        lawyers: (c.lawyers || []) as string[],
-        reviewer: c.reviewer || '',
-        description: c.description || '',
-        long_description: c.long_description || ''
-      })
-    } else {
-      setSelectedCase(null)
-      setEditCaseData({
-        title: row.title,
-        court_name: row.court_name || '',
-        lawyers: (row.lawyers || []) as string[],
-        reviewer: row.reviewer || '',
-        description: '',
-        long_description: ''
-      })
-    }
-
-    const { data: logsData } = await supabase
+      .limit(1)
+    const caseRow = (c && c[0]) as Case | undefined
+    setSelectedCase(caseRow || null)
+    setEditCaseData({
+      title: caseRow?.title || row.title,
+      court_name: caseRow?.court_name || row.court_name || '',
+      lawyers: (caseRow?.lawyers || row.lawyers || []) as string[],
+      reviewer: caseRow?.reviewer || row.reviewer || '',
+      description: caseRow?.description || '',
+      long_description: caseRow?.long_description || ''
+    })
+    const { data: lg } = await supabase
       .from('activity_logs')
       .select('*')
       .eq('case_id', row.case_id)
       .order('created_at', { ascending: true })
-    setLogs((logsData || []) as ActivityLog[])
+    setLogs((lg || []) as ActivityLog[])
   }
 
   const handleCreate = async () => {
     if (!authStatus.isLoggedIn || !newCase.title || !selectedDate) return
+    if (adding) return
     setAdding(true)
     try {
       const { caseRow } = await createCaseAndSession({
@@ -404,11 +433,9 @@ export default function Page() {
         long_description: newCase.long_description || null,
         session_date: formatDateISO(selectedDate)
       })
-
-      if ((caseRow.court_name || '').trim()) pushMRU('mru:courts', (caseRow.court_name || '').trim())
-      if ((caseRow.reviewer || '').trim()) pushMRU('mru:reviewers', (caseRow.reviewer || '').trim())
-      ;(caseRow.lawyers || []).forEach(l => l && pushMRU('mru:lawyers', l.trim()))
-
+      if (caseRow?.court_name?.trim()) pushMRU('mru:courts', caseRow.court_name.trim())
+      if (caseRow?.reviewer?.trim()) pushMRU('mru:reviewers', caseRow.reviewer.trim())
+      ;(caseRow?.lawyers || []).forEach(l => l && pushMRU('mru:lawyers', l.trim()))
       setNewCase({ title: '', court_name: '', lawyers: [], reviewer: '', description: '', long_description: '' })
       await loadMonth()
       toast.success('تمت إضافة القضية والجلسة')
@@ -422,7 +449,7 @@ export default function Page() {
   const handleUpdateCase = async () => {
     if (!selectedRow || !authStatus.isLoggedIn) return
     try {
-      const { data, error } = await updateCase(selectedRow.case_id, {
+      const { data, error } = await updateCaseApi(selectedRow.case_id, {
         title: editCaseData.title,
         court_name: editCaseData.court_name || null,
         lawyers: editCaseData.lawyers.length ? editCaseData.lawyers : null,
@@ -432,6 +459,7 @@ export default function Page() {
       } as Partial<Case>)
       if (error) throw error
       if (data) {
+        setSelectedCase(data)
         setSelectedRow({
           ...selectedRow,
           title: data.title,
@@ -439,10 +467,9 @@ export default function Page() {
           lawyers: data.lawyers,
           reviewer: data.reviewer
         } as CalendarRow)
-        setSelectedCase(data)
         await loadMonth()
-        if ((data.court_name || '').trim()) pushMRU('mru:courts', (data.court_name || '').trim())
-        if ((data.reviewer || '').trim()) pushMRU('mru:reviewers', (data.reviewer || '').trim())
+        if (data.court_name?.trim()) pushMRU('mru:courts', data.court_name.trim())
+        if (data.reviewer?.trim()) pushMRU('mru:reviewers', data.reviewer.trim())
         ;(data.lawyers || []).forEach(l => l && pushMRU('mru:lawyers', l.trim()))
       }
       setEditMode(false)
@@ -455,17 +482,19 @@ export default function Page() {
   const handlePostpone = async () => {
     if (!postponing || !postponeDate || !authStatus.isLoggedIn) return
     try {
-      const sess = {
-        id: postponing.session_id,
-        case_id: postponing.case_id,
-        session_date: postponing.session_date,
-        status: postponing.session_status,
-        postponed_to: postponing.postponed_to,
-        postpone_reason: null,
-        notes: null,
-        created_at: ''
-      } as CaseSession
-      const { error } = await postponeSession(sess, postponeDate, null)
+      const { error } = await postponeSession(
+        {
+          id: postponing.session_id,
+          case_id: postponing.case_id,
+          session_date: postponing.session_date,
+          status: postponing.session_status,
+          postponed_to: postponing.postponed_to,
+          postpone_reason: null,
+          notes: null,
+          created_at: '' as any
+        } as CaseSession,
+        postponeDate
+      )
       if (error) throw error
       await loadMonth()
       setPostponing(null)
@@ -554,8 +583,6 @@ export default function Page() {
     return mergeSuggestions(dbResults, mru)
   }
 
-  const monthTitle = format(currentMonth, 'MMMM yyyy', { locale: ar })
-
   const handleLogout = () => {
     logout()
     setAuthStatus(getAuthStatus())
@@ -584,7 +611,7 @@ export default function Page() {
             <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="mobile-calendar-nav-btn">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
             </button>
-            <h2 className="mobile-calendar-title">{monthTitle}</h2>
+            <h2 className="mobile-calendar-title">{format(currentMonth, 'MMMM yyyy', { locale: ar })}</h2>
             <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="mobile-calendar-nav-btn">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
             </button>
@@ -828,7 +855,7 @@ export default function Page() {
                       />
                     </div>
                     <div className="mobile-field-group">
-                      <label className="mobile-field-label">الوصف</label>
+                      <label className="mobile-field-label">الوصف المختصر</label>
                       <textarea
                         value={editCaseData.description}
                         onChange={e => setEditCaseData({ ...editCaseData, description: e.target.value })}
@@ -850,7 +877,7 @@ export default function Page() {
                   <>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h4 className="text-xl font-bold text-blue-400 mb-3">{selectedCase?.title || selectedRow.title}</h4>
+                        <h4 className="text-xl font-bold text-blue-400 mb-3">{selectedCase?.title ?? selectedRow.title}</h4>
                         <div className="inline-flex items-center gap-2 mb-4">
                           <span className={`mobile-status-badge ${
                             selectedRow.session_status === 'completed' ? 'mobile-status-neutral' :
@@ -866,7 +893,9 @@ export default function Page() {
                       </div>
                       {authStatus.isLoggedIn && (
                         <button onClick={() => setEditMode(true)} className="mobile-btn-icon mobile-btn-secondary">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
                         </button>
                       )}
                     </div>
@@ -875,23 +904,23 @@ export default function Page() {
                         <span className="text-gray-500 min-w-[80px]">التاريخ:</span>
                         <span>{formatDate(selectedRow.session_date)}</span>
                       </div>
-                      {!!(selectedCase?.court_name || selectedRow.court_name) && (
+                      {!!(selectedCase?.court_name ?? selectedRow.court_name) && (
                         <div className="flex items-center gap-2">
                           <span className="text-gray-500 min-w-[80px]">المحكمة:</span>
-                          <span>{selectedCase?.court_name || selectedRow.court_name}</span>
+                          <span>{selectedCase?.court_name ?? selectedRow.court_name}</span>
                         </div>
                       )}
-                      {!!(selectedCase?.reviewer || selectedRow.reviewer) && (
+                      {!!(selectedCase?.reviewer ?? selectedRow.reviewer) && (
                         <div className="flex items-center gap-2">
                           <span className="text-gray-500 min-w-[80px]">المراجع:</span>
-                          <span>{selectedCase?.reviewer || selectedRow.reviewer}</span>
+                          <span>{selectedCase?.reviewer ?? selectedRow.reviewer}</span>
                         </div>
                       )}
-                      {(selectedCase?.lawyers || selectedRow.lawyers)?.length ? (
+                      {(selectedCase?.lawyers ?? selectedRow.lawyers)?.length ? (
                         <div>
                           <span className="text-gray-500">المحامون:</span>
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {(selectedCase?.lawyers || selectedRow.lawyers || []).map((l, i) => (
+                            {(selectedCase?.lawyers ?? selectedRow.lawyers)?.map((l, i) => (
                               <span key={i} className="px-2 py-1 bg-dark-700/60 rounded-full text-xs border border-dark-600/50">{l}</span>
                             ))}
                           </div>
@@ -906,7 +935,7 @@ export default function Page() {
                       {!!selectedCase?.long_description && (
                         <div>
                           <span className="text-gray-500">التفاصيل:</span>
-                          <p className="mt-1 text-gray-300 whitespace-pre-wrap">{selectedCase.long_description}</p>
+                          <p className="mt-1 text-gray-300 whitespace-pre-line">{selectedCase.long_description}</p>
                         </div>
                       )}
                     </div>
@@ -916,32 +945,18 @@ export default function Page() {
                 <div className="border-t border-dark-600/50 pt-6">
                   <h5 className="font-semibold text-gray-300 mb-4">السجل الزمني</h5>
                   <div className="space-y-3 max-h-48 overflow-y-auto mobile-scroll-smooth">
-                    {(logs || []).map(log => (
+                    {logs.map(log => (
                       <div key={log.id} className="p-3 bg-dark-700/50 rounded-lg border border-dark-600/30">
                         <div className="flex items-center gap-2 text-xs mb-2">
                           <span className="text-gray-500">{formatDateTime(log.created_at)}</span>
-                          <span className={`mobile-status-badge ${
-                            log.action_type === 'case_created' ? 'mobile-status-success' :
-                            log.action_type === 'case_updated' ? 'mobile-status-info' :
-                            log.action_type === 'session_scheduled' ? 'mobile-status-info' :
-                            log.action_type === 'session_postponed' ? 'mobile-status-warning' :
-                            log.action_type === 'session_completed' ? 'mobile-status-neutral' :
-                            log.action_type === 'session_cancelled' ? 'mobile-status-danger' :
-                            log.action_type === 'note_added' ? 'mobile-status-info' : 'mobile-status-info'
-                          }`}>
-                            {log.action_type === 'case_created' ? 'إنشاء قضية'
-                              : log.action_type === 'case_updated' ? 'تحديث قضية'
-                              : log.action_type === 'session_scheduled' ? 'جدولة جلسة'
-                              : log.action_type === 'session_postponed' ? 'تأجيل جلسة'
-                              : log.action_type === 'session_completed' ? 'إنهاء جلسة'
-                              : log.action_type === 'session_cancelled' ? 'إلغاء جلسة'
-                              : 'ملاحظة'}
+                          <span className="mobile-status-badge mobile-status-info">
+                            {log.action_type}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-300">{log.description}</p>
+                        {log.description && <p className="text-sm text-gray-300">{log.description}</p>}
                       </div>
                     ))}
-                    {(!logs || logs.length === 0) && (
+                    {logs.length === 0 && (
                       <div className="text-center py-4 text-gray-500 text-sm">لا يوجد سجل زمني</div>
                     )}
                   </div>
@@ -966,7 +981,6 @@ export default function Page() {
                 </div>
               </div>
             </div>
-
             <div className="mobile-modal-footer">
               {editMode && authStatus.isLoggedIn ? (
                 <div className="flex gap-2">
@@ -999,8 +1013,8 @@ export default function Page() {
             </div>
             <div className="mobile-modal-body">
               <div className="space-y-4">
-                <p className="text-gray-300">تأجيل: <strong className="text-blue-400">{postponing.title}</strong></p>
-                <p className="text-sm text-gray-500">من تاريخ: {formatDate(postponing.session_date)}</p>
+                <p className="text-gray-300">تأجيل جلسة: <strong className="text-blue-400">{selectedRow?.title}</strong></p>
+                <p className="text-sm text-gray-500">من تاريخ: {postponing && formatDate(postponing.session_date)}</p>
                 <div className="mobile-field-group">
                   <label className="mobile-field-label">التاريخ الجديد</label>
                   <input

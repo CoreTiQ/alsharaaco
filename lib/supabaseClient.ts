@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 
 export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   { auth: { persistSession: false } }
 )
 
@@ -35,14 +35,8 @@ export type ActivityLog = {
   case_id: string | null
   session_id: string | null
   action_type:
-    | 'case_created'
-    | 'case_updated'
-    | 'case_completed'
-    | 'case_cancelled'
-    | 'session_scheduled'
-    | 'session_postponed'
-    | 'session_completed'
-    | 'session_cancelled'
+    | 'case_created' | 'case_updated' | 'case_completed' | 'case_cancelled'
+    | 'session_scheduled' | 'session_postponed' | 'session_completed' | 'session_cancelled'
     | 'note_added'
   description: string
   details: any
@@ -50,27 +44,13 @@ export type ActivityLog = {
   created_by: string | null
 }
 
-export type CalendarRow = {
-  session_id: string
-  session_date: string
-  session_status: 'scheduled' | 'completed' | 'postponed' | 'cancelled'
-  postponed_to: string | null
-  case_id: string
-  title: string
-  court_name: string | null
-  lawyers: string[] | null
-  reviewer: string | null
-  case_status: 'active' | 'completed' | 'cancelled'
-}
-
-export async function fetchMonthSessions(fromISO: string, toISO: string) {
+export async function fetchMonthSessions(from: string, to: string) {
   return await supabase
     .from('v_calendar_sessions')
     .select('*')
-    .gte('session_date', fromISO)
-    .lte('session_date', toISO)
+    .gte('session_date', from)
+    .lte('session_date', to)
     .order('session_date', { ascending: true })
-    .order('title', { ascending: true })
 }
 
 export async function createCaseAndSession(input: {
@@ -82,79 +62,87 @@ export async function createCaseAndSession(input: {
   long_description: string | null
   session_date: string
 }) {
-  const { data: caseRow, error: e1 } = await supabase
-    .from('cases')
-    .insert([
-      {
-        title: input.title,
-        court_name: input.court_name,
-        lawyers: input.lawyers,
-        reviewer: input.reviewer,
-        description: input.description,
-        long_description: input.long_description,
-        status: 'active'
-      }
-    ])
-    .select()
-    .single()
-  if (e1) throw e1
-
-  const { data: sessionRow, error: e2 } = await supabase
-    .from('case_sessions')
-    .insert([
-      {
-        case_id: caseRow.id,
-        session_date: input.session_date,
-        status: 'scheduled'
-      }
-    ])
-    .select()
-    .single()
-  if (e2) throw e2
-
-  return { caseRow: caseRow as Case, sessionRow: sessionRow as CaseSession }
-}
-
-export async function updateCase(caseId: string, patch: Partial<Case>) {
-  // لا ترسل undefined — فقط الحقول الموجودة
-  const payload: Record<string, any> = {}
-  for (const [k, v] of Object.entries(patch)) {
-    if (v !== undefined) payload[k] = v
+  const casePayload: Partial<Case> = {
+    title: input.title,
+    court_name: input.court_name,
+    lawyers: input.lawyers && input.lawyers.length ? input.lawyers : null,
+    reviewer: input.reviewer,
+    description: input.description,
+    long_description: input.long_description,
+    status: 'active'
   }
-  const { data, error } = await supabase
+
+  const { data: casesIns, error: caseErr } = await supabase
     .from('cases')
-    .update(payload)
-    .eq('id', caseId)
-    .select()
-    .single()
-  return { data: data as Case | null, error }
+    .insert([casePayload])
+    .select('*')
+  if (caseErr) throw caseErr
+  const caseRow = casesIns![0] as Case
+
+  const { error: sesErr } = await supabase
+    .from('case_sessions')
+    .insert([{ case_id: caseRow.id, session_date: input.session_date, status: 'scheduled' }])
+  if (sesErr) throw sesErr
+
+  return { caseRow }
 }
 
-export async function postponeSession(session: CaseSession, toDate: string, reason?: string | null) {
-  // نُحدّث session_date نفسُه ليظهر في اليوم الجديد، ونحفظ from/to في الـ trigger عبر postponed_to
-  return await supabase
+export async function postponeSession(session: CaseSession, newDate: string) {
+  const { error: upErr } = await supabase
     .from('case_sessions')
-    .update({
-      status: 'postponed',
-      postponed_to: toDate,
-      session_date: toDate,
-      postpone_reason: reason || null
-    })
+    .update({ status: 'postponed', postponed_to: newDate })
     .eq('id', session.id)
+  if (upErr) return { error: upErr }
+
+  const { error: insErr } = await supabase
+    .from('case_sessions')
+    .insert([{ case_id: session.case_id, session_date: newDate, status: 'scheduled' }])
+  return { error: insErr || null }
 }
 
 export async function completeSession(session_id: string) {
-  return await supabase
+  const { error } = await supabase
     .from('case_sessions')
     .update({ status: 'completed' })
     .eq('id', session_id)
+  return { error }
 }
 
-export async function addNoteToLog(case_id: string, session_id: string | null, note: string) {
+/**
+ * إصلاح خطأ 400 عند PATCH:
+ * - لا نستخدم .single() لتجنّب إرسال Accept: application/vnd.pgrst.object+json
+ * - نرجع الصف الأول من المصفوفة
+ */
+export async function updateCase(id: string, patch: Partial<Case>) {
+  const payload: any = {
+    title: patch.title ?? undefined,
+    court_name: patch.court_name ?? null,
+    lawyers: (patch.lawyers && patch.lawyers.length) ? patch.lawyers : null,
+    reviewer: patch.reviewer ?? null,
+    description: patch.description ?? null,
+    long_description: patch.long_description ?? null
+  }
+
+  const { data, error } = await supabase
+    .from('cases')
+    .update(payload)
+    .eq('id', id)
+    .select('*')
+
+  return { data: data?.[0] as Case | undefined, error }
+}
+
+export async function addNoteToLog(case_id: string, session_id: string, text: string) {
   const { data, error } = await supabase
     .from('activity_logs')
-    .insert([{ case_id, session_id, action_type: 'note_added', description: note, details: null }])
-    .select()
-    .single()
-  return { data: data as ActivityLog | null, error }
+    .insert([{
+      case_id,
+      session_id,
+      action_type: 'note_added',
+      description: text,
+      details: null
+    }])
+    .select('*')
+
+  return { data: data?.[0] as ActivityLog | undefined, error }
 }
