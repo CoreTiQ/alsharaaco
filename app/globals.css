@@ -292,18 +292,20 @@
     box-sizing: border-box;
   }
   
-  /* ===== Mobile Calendar Grid - PREVENT COLUMN HIDING ===== */
+  /* ===== Mobile Calendar Grid - RTL FIXED ===== */
   .mobile-calendar-content {
     padding: var(--space-2);
     overflow: visible;
     width: 100%;
     box-sizing: border-box;
+    direction: ltr; /* Force LTR for grid layout */
   }
   
   .mobile-calendar-grid-container {
     width: 100%;
     overflow: visible;
     box-sizing: border-box;
+    direction: ltr;
   }
   
   .mobile-calendar-grid {
@@ -315,7 +317,9 @@
     border-radius: 0;
     width: 100%;
     box-sizing: border-box;
-    min-width: 0; /* Important for grid overflow */
+    min-width: 0;
+    direction: ltr; /* Ensure LTR grid */
+    margin: 0 auto;
   }
   
   .mobile-calendar-header {
@@ -337,10 +341,10 @@
     border: 1px solid rgba(71, 85, 105, 0.3);
     box-sizing: border-box;
     margin: 0;
-    min-width: 0; /* Prevent overflow */
-    overflow: hidden;
+    min-width: 0;
+    overflow: visible; /* Show full text */
     white-space: nowrap;
-    text-overflow: ellipsis;
+    direction: rtl; /* RTL for Arabic text */
   }
   
   .mobile-calendar-day {
@@ -359,10 +363,11 @@
     cursor: pointer;
     transition: all var(--transition-normal);
     position: relative;
-    overflow: hidden;
+    overflow: visible; /* Show full content */
     box-sizing: border-box;
     margin: 0;
-    min-width: 0; /* Prevent overflow */
+    min-width: 0;
+    direction: rtl; /* RTL for Arabic numbers */
   }
   
   .mobile-calendar-day::before {
@@ -392,6 +397,9 @@
     color: var(--color-text);
     line-height: 1;
     text-align: center;
+    width: 100%;
+    overflow: visible;
+    white-space: nowrap;
   }
   
   .mobile-calendar-day-events {
@@ -404,12 +412,12 @@
     line-height: 1.2;
     white-space: nowrap;
     border: 1px solid rgba(59, 130, 246, 0.4);
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
     max-width: 100%;
+    text-align: center;
   }
   
-  /* Calendar day states - RESPONSIVE */
+  /* Calendar day states - RTL SAFE */
   .mobile-calendar-day.today {
     background: rgba(59, 130, 246, 0.3);
     border-color: #3b82f6;
