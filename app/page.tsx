@@ -422,6 +422,12 @@ export default function MobileCalendar() {
         return
       }
       
+      console.log('Starting update with delete/insert approach')
+      
+      // حفظ البيانات الأصلية
+      const originalEvent = { ...selectedEvent }
+      
+      // البيانات المحدثة
       const updateData = {
         title: editData.title.trim(),
         court_name: editData.court_name?.trim() || null,
@@ -431,17 +437,48 @@ export default function MobileCalendar() {
         long_description: editData.long_description?.trim() || null
       }
       
-      const { data, error } = await safeUpdate('events', updateData, { id: selectedEvent.id })
+      // حذف القضية الأصلية
+      const { error: deleteError } = await supabase
+        .from('events')
+        .delete()
+        .eq('id', selectedEvent.id)
       
-      if (error) {
-        throw new Error(error)
+      if (deleteError) {
+        console.error('Delete error:', deleteError)
+        throw new Error(`خطأ في حذف القضية: ${deleteError.message}`)
       }
       
-      const updated = data?.[0]
+      // إدراج القضية مع البيانات المحدثة
+      const { data: newEventData, error: insertError } = await supabase
+        .from('events')
+        .insert([{
+          id: originalEvent.id,
+          case_ref: originalEvent.case_ref,
+          date: originalEvent.date,
+          title: updateData.title,
+          court_name: updateData.court_name,
+          lawyers: updateData.lawyers,
+          reviewer: updateData.reviewer,
+          description: updateData.description,
+          long_description: updateData.long_description,
+          status: originalEvent.status,
+          postponed_to: originalEvent.postponed_to,
+          created_at: originalEvent.created_at,
+          deleted_at: null
+        }])
+        .select()
+      
+      if (insertError) {
+        console.error('Insert error:', insertError)
+        throw new Error(`خطأ في إعادة إدراج القضية: ${insertError.message}`)
+      }
+      
+      const updated = newEventData?.[0]
       if (updated) {
         setEvents(prev => prev.map(e => (e.id === selectedEvent.id ? updated : e)))
         setSelectedEvent(updated)
         
+        // حفظ في MRU
         if (updateData.court_name) pushMRU('mru:courts', updateData.court_name)
         if (updateData.reviewer) pushMRU('mru:reviewers', updateData.reviewer)
         updateData.lawyers?.forEach(lawyer => {
@@ -470,33 +507,70 @@ export default function MobileCalendar() {
       
       const formattedDate = format(validDate, 'yyyy-MM-dd')
       
-      const { error: updateError } = await safeUpdate('events', { 
-        status: 'postponed', 
-        postponed_to: formattedDate 
-      }, { id: postponingEvent.id })
+      // الحل البديل: حذف وإعادة إدراج بدلاً من التحديث
+      console.log('Starting postpone with delete/insert approach')
       
-      if (updateError) {
-        throw new Error(`خطأ في تحديث القضية: ${updateError}`)
+      // حفظ بيانات القضية الأصلية
+      const originalEvent = { ...postponingEvent }
+      
+      // حذف القضية الأصلية
+      const { error: deleteError } = await supabase
+        .from('events')
+        .delete()
+        .eq('id', postponingEvent.id)
+      
+      if (deleteError) {
+        console.error('Delete error:', deleteError)
+        throw new Error(`خطأ في حذف القضية القديمة: ${deleteError.message}`)
       }
       
+      // إدراج القضية الأصلية مع الحالة المؤجلة
+      const { error: insertOldError } = await supabase
+        .from('events')
+        .insert([{
+          id: originalEvent.id,
+          case_ref: originalEvent.case_ref,
+          date: originalEvent.date,
+          title: originalEvent.title,
+          court_name: originalEvent.court_name,
+          lawyers: originalEvent.lawyers,
+          reviewer: originalEvent.reviewer,
+          description: originalEvent.description,
+          long_description: originalEvent.long_description,
+          status: 'postponed',
+          postponed_to: formattedDate,
+          created_at: originalEvent.created_at,
+          deleted_at: null
+        }])
+      
+      if (insertOldError) {
+        console.error('Insert old error:', insertOldError)
+        throw new Error(`خطأ في إعادة إدراج القضية المؤجلة: ${insertOldError.message}`)
+      }
+      
+      // إدراج القضية الجديدة بالتاريخ الجديد
       const newEventData = {
         date: formattedDate,
-        title: postponingEvent.title,
-        court_name: postponingEvent.court_name || null,
-        lawyers: postponingEvent.lawyers || null,
-        reviewer: postponingEvent.reviewer || null,
-        description: postponingEvent.description || null,
-        long_description: postponingEvent.long_description || null,
+        title: originalEvent.title,
+        court_name: originalEvent.court_name,
+        lawyers: originalEvent.lawyers,
+        reviewer: originalEvent.reviewer,
+        description: originalEvent.description,
+        long_description: originalEvent.long_description,
         status: 'open',
-        case_ref: postponingEvent.case_ref
+        case_ref: originalEvent.case_ref
       }
       
-      const { error: insertError } = await safeInsert('events', newEventData)
+      const { error: insertNewError } = await supabase
+        .from('events')
+        .insert([newEventData])
       
-      if (insertError) {
-        throw new Error(`خطأ في إنشاء القضية الجديدة: ${insertError}`)
+      if (insertNewError) {
+        console.error('Insert new error:', insertNewError)
+        throw new Error(`خطأ في إنشاء القضية الجديدة: ${insertNewError.message}`)
       }
       
+      // إعادة تحميل الأحداث
       await fetchEvents()
       setPostponingEvent(null)
       setPostponeDate('')
