@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "الشرع للمحاماة",
   description: "نظام متقدم لإدارة القضايا والمواعيد القانونية",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "الشرع" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "الشرع للمحاماة" },
   formatDetection: { telephone: false }
 }
 
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="الشرع" />
+        <meta name="apple-mobile-web-app-title" content="الشرع للمحاماة" />
       </head>
       <body>
         <SwClient />
