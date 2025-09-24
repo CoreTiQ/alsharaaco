@@ -575,30 +575,32 @@ export default function MobileCalendar() {
             </div>
           ) : (
             <div className="mobile-calendar-content">
-              <div className="mobile-calendar-grid">
-                <div className="mobile-calendar-header">
-                  {['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map(day => (
-                    <div key={day} className="mobile-calendar-day-header">{day}</div>
-                  ))}
+              <div className="mobile-calendar-grid-container">
+                <div className="mobile-calendar-grid">
+                  <div className="mobile-calendar-header">
+                    {['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map(day => (
+                      <div key={day} className="mobile-calendar-day-header mobile-calendar-item">{day}</div>
+                    ))}
+                  </div>
+                  {calendarDays.map(day => {
+                    const items = dayEvents(day)
+                    const inMonth = isCurrentMonth(day)
+                    return (
+                      <button
+                        key={day.toISOString()}
+                        onClick={() => openDay(day)}
+                        className={`mobile-calendar-day mobile-calendar-item ${!inMonth ? 'other-month' : ''} ${isToday(day) ? 'today' : ''} ${items.length > 0 ? 'has-events' : ''}`}
+                      >
+                        <div className="mobile-calendar-day-number">{format(day, 'd')}</div>
+                        {items.length > 0 && (
+                          <div className="mobile-calendar-day-events">
+                            {items.length} قضية
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
-                {calendarDays.map(day => {
-                  const items = dayEvents(day)
-                  const inMonth = isCurrentMonth(day)
-                  return (
-                    <button
-                      key={day.toISOString()}
-                      onClick={() => openDay(day)}
-                      className={`mobile-calendar-day ${!inMonth ? 'other-month' : ''} ${isToday(day) ? 'today' : ''} ${items.length > 0 ? 'has-events' : ''}`}
-                    >
-                      <div className="mobile-calendar-day-number">{format(day, 'd')}</div>
-                      {items.length > 0 && (
-                        <div className="mobile-calendar-day-events">
-                          {items.length} قضية
-                        </div>
-                      )}
-                    </button>
-                  )
-                })}
               </div>
             </div>
           )}
