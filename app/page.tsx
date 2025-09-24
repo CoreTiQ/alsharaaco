@@ -111,9 +111,7 @@ function MobileAutocompleteInput(props: {
       if (!ignore) setItems(merged)
     }
     run()
-    return () => {
-      ignore = true
-    }
+    return () => { ignore = true }
   }, [debounced, fetcher, mru])
 
   useEffect(() => {
@@ -556,6 +554,8 @@ export default function Page() {
     return mergeSuggestions(dbResults, mru)
   }
 
+  const monthTitle = format(currentMonth, 'MMMM yyyy', { locale: ar })
+
   const handleLogout = () => {
     logout()
     setAuthStatus(getAuthStatus())
@@ -584,7 +584,7 @@ export default function Page() {
             <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="mobile-calendar-nav-btn">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
             </button>
-            <h2 className="mobile-calendar-title">{format(currentMonth, 'MMMM yyyy', { locale: ar })}</h2>
+            <h2 className="mobile-calendar-title">{monthTitle}</h2>
             <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="mobile-calendar-nav-btn">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
             </button>

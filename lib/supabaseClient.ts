@@ -116,9 +116,14 @@ export async function createCaseAndSession(input: {
 }
 
 export async function updateCase(caseId: string, patch: Partial<Case>) {
+  // لا ترسل undefined — فقط الحقول الموجودة
+  const payload: Record<string, any> = {}
+  for (const [k, v] of Object.entries(patch)) {
+    if (v !== undefined) payload[k] = v
+  }
   const { data, error } = await supabase
     .from('cases')
-    .update(patch)
+    .update(payload)
     .eq('id', caseId)
     .select()
     .single()
@@ -126,9 +131,15 @@ export async function updateCase(caseId: string, patch: Partial<Case>) {
 }
 
 export async function postponeSession(session: CaseSession, toDate: string, reason?: string | null) {
+  // نُحدّث session_date نفسُه ليظهر في اليوم الجديد، ونحفظ from/to في الـ trigger عبر postponed_to
   return await supabase
     .from('case_sessions')
-    .update({ status: 'postponed', postponed_to: toDate, postpone_reason: reason || null })
+    .update({
+      status: 'postponed',
+      postponed_to: toDate,
+      session_date: toDate,
+      postpone_reason: reason || null
+    })
     .eq('id', session.id)
 }
 
