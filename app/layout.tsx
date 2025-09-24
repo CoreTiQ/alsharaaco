@@ -1,16 +1,13 @@
 import type { Metadata, Viewport } from "next"
 import "./globals.css"
 import { Toaster } from "react-hot-toast"
+import SwClient from "./sw-client"
 
 export const metadata: Metadata = {
   title: "الشرع للمحاماة",
   description: "نظام متقدم لإدارة القضايا والمواعيد القانونية",
   manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "الشرع"
-  },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "الشرع" },
   formatDetection: { telephone: false }
 }
 
@@ -35,12 +32,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-title" content="الشرع" />
       </head>
       <body>
+        <SwClient />
         {children}
         <Toaster
           position="top-center"
-          toastOptions={{
-            style: { background: "#1e293b", color: "#f1f5f9", border: "1px solid #334155" }
-          }}
+          toastOptions={{ style: { background: "#1e293b", color: "#f1f5f9", border: "1px solid #334155" } }}
         />
       </body>
     </html>

@@ -1,15 +1,47 @@
-const CACHE_NAME = 'law-calendar-v1'
-const urlsToCache = ['/', '/manifest.json']
+const CACHE_VERSION = 'v3'
+const RUNTIME = 'runtime-' + CACHE_VERSION
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(urlsToCache)).then(() => self.skipWaiting()))
+self.addEventListener('install', (event) => {
+  self.skipWaiting()
 })
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(names => Promise.all(names.filter(n => n !== CACHE_NAME).map(n => caches.delete(n)))).then(() => self.clients.claim())
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== RUNTIME).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
   )
+  self.clients.matchAll({ type: 'window' }).then((clients) => {
+    clients.forEach((client) => client.postMessage({ type: 'RELOAD' }))
+  })
 })
-self.addEventListener('fetch', e => {
-  if (e.request.url.includes('/api/') || e.request.url.includes('supabase')) return
-  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)))
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request
+  const url = new URL(req.url)
+
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req).catch(() => caches.match('/'))
+    )
+    return
+  }
+
+  if (
+    url.pathname.startsWith('/_next/') ||
+    url.pathname.endsWith('.css') ||
+    url.href.includes('supabase')
+  ) {
+    return
+  }
+
+  event.respondWith(
+    caches.open(RUNTIME).then(async (cache) => {
+      const res = await cache.match(req)
+      if (res) return res
+      const net = await fetch(req)
+      try { cache.put(req, net.clone()) } catch (e) {}
+      return net
+    })
+  )
 })
