@@ -479,31 +479,19 @@ export default function Page() {
     }
   }
 
-  const handlePostpone = async () => {
-    if (!postponing || !postponeDate || !authStatus.isLoggedIn) return
-    try {
-      const { error } = await postponeSession(
-        {
-          id: postponing.session_id,
-          case_id: postponing.case_id,
-          session_date: postponing.session_date,
-          status: postponing.session_status,
-          postponed_to: postponing.postponed_to,
-          postpone_reason: null,
-          notes: null,
-          created_at: '' as any
-        } as CaseSession,
-        postponeDate
-      )
-      if (error) throw error
-      await loadMonth()
-      setPostponing(null)
-      setPostponeDate('')
-      toast.success('تم التأجيل')
-    } catch {
-      toast.error('فشل التأجيل')
-    }
+const handlePostpone = async () => {
+  if (!postponing || !postponeDate || !authStatus.isLoggedIn) return;
+  try {
+    await postponeSession(postponing.session_id, postponeDate, null); // لا تفكّك نتيجة الدالة
+    await loadMonth();
+    setPostponing(null);
+    setPostponeDate('');
+    toast.success('تم التأجيل');
+  } catch (err) {
+    toast.error('فشل التأجيل');
   }
+};
+
 
   const handleComplete = async (row: CalendarRow) => {
     if (!authStatus.isLoggedIn) return

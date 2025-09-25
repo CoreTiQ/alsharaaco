@@ -87,18 +87,39 @@ export async function createCaseAndSession(input: {
   return { caseRow }
 }
 
-export async function postponeSession(session: CaseSession, newDate: string) {
-  const { error: upErr } = await supabase
+export async function postponeSession(sessionId: string, newDate: string, reason?: string | null) {
+  // اقرأ الجلسة للحصول على case_id
+  const { data: s, error: e0 } = await supabase
     .from('case_sessions')
-    .update({ status: 'postponed', postponed_to: newDate })
-    .eq('id', session.id)
-  if (upErr) return { error: upErr }
+    .select('case_id, session_date, status')
+    .eq('id', sessionId)
+    .single();
+  if (e0) throw e0;
 
-  const { error: insErr } = await supabase
+  // علِّم الجلسة الحالية كمؤجَّلة
+  const { error: e1 } = await supabase
     .from('case_sessions')
-    .insert([{ case_id: session.case_id, session_date: newDate, status: 'scheduled' }])
-  return { error: insErr || null }
+    .update({
+      status: 'postponed',
+      postponed_to: newDate,
+      postpone_reason: reason ?? null,
+    })
+    .eq('id', sessionId);
+  if (e1) throw e1;
+
+  // أضف جلسة "scheduled" في التاريخ الجديد مع منع التكرار
+  // ملاحظة: استخدم upsert مع onConflict + ignoreDuplicates = true
+  const { error: e2 } = await supabase
+    .from('case_sessions')
+    .upsert(
+      [{ case_id: s.case_id, session_date: newDate, status: 'scheduled' }],
+      { onConflict: 'case_id,session_date', ignoreDuplicates: true }
+    );
+  if (e2) throw e2;
+
+  return true; // نجاح صريح
 }
+
 
 export async function completeSession(session_id: string) {
   const { error } = await supabase
