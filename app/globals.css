@@ -1059,7 +1059,7 @@
   .mobile-calendar {
     width: 100%;
     max-width: 100%;
-    height: calc(100vh - 80px - 4rem);
+    height: calc(117vh - 80px - 4rem);
     display: flex;
     flex-direction: column;
   }
