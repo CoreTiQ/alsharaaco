@@ -105,11 +105,12 @@ export async function postponeSession(sessionId: string, newDate: string, reason
     .eq('id', sessionId);
   if (e1) throw e1;
 
+  // سجّل جلسة جديدة "scheduled" على التاريخ الجديد، وتجاهل الازدواجية إن وُجدت
   const { error: e2 } = await supabase
     .from('case_sessions')
     .upsert(
       [{ case_id: cur.case_id, session_date: newDate, status: 'scheduled' }],
-      { onConflict: 'case_id,session_date', ignoreDuplicates: true }
+      { onConflict: 'case_id,session_date,status', ignoreDuplicates: true }
     );
   if (e2) throw e2;
 
