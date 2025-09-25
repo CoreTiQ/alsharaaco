@@ -88,15 +88,13 @@ export async function createCaseAndSession(input: {
 }
 
 export async function postponeSession(sessionId: string, newDate: string, reason?: string | null) {
-  // اقرأ الجلسة للحصول على case_id
-  const { data: s, error: e0 } = await supabase
+  const { data: cur, error: e0 } = await supabase
     .from('case_sessions')
     .select('case_id, session_date, status')
     .eq('id', sessionId)
     .single();
   if (e0) throw e0;
 
-  // علِّم الجلسة الحالية كمؤجَّلة
   const { error: e1 } = await supabase
     .from('case_sessions')
     .update({
@@ -107,18 +105,17 @@ export async function postponeSession(sessionId: string, newDate: string, reason
     .eq('id', sessionId);
   if (e1) throw e1;
 
-  // أضف جلسة "scheduled" في التاريخ الجديد مع منع التكرار
-  // ملاحظة: استخدم upsert مع onConflict + ignoreDuplicates = true
   const { error: e2 } = await supabase
     .from('case_sessions')
     .upsert(
-      [{ case_id: s.case_id, session_date: newDate, status: 'scheduled' }],
+      [{ case_id: cur.case_id, session_date: newDate, status: 'scheduled' }],
       { onConflict: 'case_id,session_date', ignoreDuplicates: true }
     );
   if (e2) throw e2;
 
-  return true; // نجاح صريح
+  return true;
 }
+
 
 
 export async function completeSession(session_id: string) {

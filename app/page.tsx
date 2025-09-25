@@ -481,16 +481,28 @@ export default function Page() {
 
 const handlePostpone = async () => {
   if (!postponing || !postponeDate || !authStatus.isLoggedIn) return;
+
   try {
-    await postponeSession(postponing.session_id, postponeDate, null); // لا تفكّك نتيجة الدالة
-    await loadMonth();
+    await postponeSession(postponing.session_id, postponeDate, null);
+    // نجح التأجيل، أعرض نجاح الآن
+    toast.success('تم التأجيل');
+
+    // حاول التحديث بشكل منفصل حتى لو فشل لا نقول "فشل التأجيل"
+    try {
+      await loadMonth();
+    } catch (e) {
+      console.warn('Reload after postpone failed:', e);
+      toast('تم التأجيل، لكن فشل تحديث العرض. حدّث الصفحة.', { icon: 'ℹ️' });
+    }
+
     setPostponing(null);
     setPostponeDate('');
-    toast.success('تم التأجيل');
-  } catch (err) {
+  } catch (err: any) {
+    console.error('Postpone failed:', err);
     toast.error('فشل التأجيل');
   }
 };
+
 
 
   const handleComplete = async (row: CalendarRow) => {
