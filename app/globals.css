@@ -1314,7 +1314,7 @@
   }
   
   .mobile-calendar {
-    height: calc(100vh - 90px - 6rem);
+    height: calc(117vh - 90px - 6rem);
   }
   
   .mobile-calendar-nav {
